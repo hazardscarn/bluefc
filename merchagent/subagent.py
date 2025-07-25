@@ -1,5 +1,5 @@
 # product_recommendation_agent.py
-from google.adk.agents import Agent
+from google.adk.agents import Agent,SequentialAgent,LlmAgent
 from google.adk.tools import FunctionTool
 from google.adk.tools.agent_tool import AgentTool
 from .config import Modelconfig
@@ -9,20 +9,80 @@ from typing import Dict, List, Any
 import json
 import vertexai
 from vertexai.generative_models import GenerativeModel, GenerationConfig
+import logging
+from vertexai.generative_models import (
+    GenerativeModel,
+    GenerationConfig,
+    SafetySetting,
+    HarmCategory,
+    HarmBlockThreshold,
+)
+from vertexai.generative_models import GenerationConfig
+
+step_logger = logging.getLogger("AGENT_STEPS")
+
 
 def create_persona_function(tool_context: ToolContext) -> Dict[str, Any]:
-    """Create consumer persona from insights report"""
+    """Create a comprehensive consumer persona from audience insights for Chelsea FC merchandise recommendations.
     
-    # Check for required insights
-    required_insights = ['tag_insight','brand_insight']
-    missing_insights = []
+    This function analyzes cultural preference data, demographic signals, and audience insights to create
+    a detailed consumer persona that will guide merchandise recommendations. The persona includes 
+    demographic profiles, cultural values, economic behaviors, and Chelsea-specific preferences.
     
-    for insight in required_insights:
-        if not tool_context.state.get(insight):
-            missing_insights.append(insight)
+    Args:
+        tool_context (ToolContext): ADK tool context containing session state with required insights data.
+                                  Expected state keys:
+                                  - 'brand_insight': Brand preference insights
+                                  - 'tag_insight': Lifestyle tag insights
+                                  - 'movie_insight': Entertainment preferences
+                                  - 'artist_insight': Music preferences
+                                  - 'podcast_insight': Audio content preferences
+                                  - 'person_insight': Public figure preferences
+                                  - 'detected_signals': Demographic signals (age, gender, location)
+                                  - 'detected_audience_names': List of detected audience segments
     
-    if missing_insights:
-        return {"error": f"Missing required insights: {', '.join(missing_insights)}. Run insights generation first."}
+    Returns:
+        Dict[str, Any]: Result dictionary containing:
+            - 'success' (bool): True if persona creation succeeded
+            - 'persona_created' (bool): True if persona was successfully created
+            - 'persona_name' (str): Generated persona name
+            - 'message' (str): Status message
+            - 'error' (str): Error message if creation failed
+    
+    State Updates:
+        Updates tool_context.state with the following keys:
+        - 'persona_name': Creative name for the persona
+        - 'persona_description': 2-3 sentence persona summary
+        - 'audience_profile': Demographics, lifestyle, and values
+        - 'cultural_values': Entertainment preferences and brand affinities
+        - 'economic_values': Spending patterns and price sensitivity
+        - 'merchandise_preferences': Chelsea product preferences
+        - 'purchase_motivations': Key buying decision factors
+    
+    Raises:
+        Exception: If LLM generation fails or JSON parsing fails
+    
+    Example:
+        >>> result = create_persona_function(tool_context)
+        >>> if result['success']:
+        ...     persona_name = tool_context.state['persona_name']
+        ...     print(f"Created persona: {persona_name}")
+    
+    Note:
+        Requires brand_insight and tag_insight to be present in tool_context.state.
+        Uses Gemini 2.5 Flash model for persona generation with JSON output format.
+    """
+    step_logger.info("STEP 4a: 👤 Creating consumer persona from insights...")
+    
+    # Check for insights
+    brand_insight = tool_context.state.get('brand_insight', '')
+    tag_insight = tool_context.state.get('tag_insight', '')
+    
+    if not brand_insight or not tag_insight:
+        step_logger.error("   ❌ Missing required insights for persona creation")
+        return {"error": "Missing insights"}
+    
+    step_logger.info(f"   📝 Using {len(brand_insight)} chars of brand data, {len(tag_insight)} chars of tag data")
     
     # Gather all insights
     insights_data = {
@@ -41,7 +101,7 @@ def create_persona_function(tool_context: ToolContext) -> Dict[str, Any]:
 
 TASK: Create a comprehensive consumer persona for Chelsea FC merchandise targeting based on the provided audience insights.
 
-CONTEXT: You have detailed cultural preference data from Qloo API showing what this audience likes in terms of brands, movies, music, and lifestyle tags. This persona will guide our merchandise recommendations to maximize fan engagement and purchase likelihood.
+CONTEXT: You have detailed audience signals and cultural preference data showing what this audience likes in terms of brands, movies, music, and lifestyle tags. This persona will guide our merchandise recommendations to maximize fan engagement and purchase likelihood.
 
 INSIGHTS DATA:
 {json.dumps(insights_data, indent=2)}
@@ -82,16 +142,24 @@ GUIDELINES:
 - Focus on how cultural preferences translate to merchandise appeal
 - Consider both rational and emotional purchase drivers
 - Keep descriptions specific and actionable for product recommendations
-- Ensure persona aligns with Chelsea FC brand values and fan culture"""
+- Ensure persona aligns with Chelsea FC brand values and fan culture
+- You will always create persona from the insights and signals and demographics provided
+"""
 
     try:
         model = GenerativeModel(
             Modelconfig.flash_model,
             generation_config=GenerationConfig(
                 temperature=0.2,
-                max_output_tokens=6000,
+                max_output_tokens=20000,
                 response_mime_type="application/json"
-            )
+            ),
+            safety_settings={
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
         )
         
         response = model.generate_content(prompt)
@@ -106,6 +174,7 @@ GUIDELINES:
         tool_context.state['merchandise_preferences'] = persona_data.get('chelsea_merchandise_preferences', {})
         tool_context.state['purchase_motivations'] = persona_data.get('purchase_motivations', [])
         #tool_context.state['full_persona'] = persona_data
+        step_logger.info(f"   ✅ Created persona: '{persona_data.get('persona_name', '')}'")
         
         return {
             "success": True,
@@ -119,7 +188,64 @@ GUIDELINES:
 
 
 def generate_product_reasoning_function(tool_context: ToolContext) -> Dict[str, Any]:
-    """Generate reasoning for why recommended products appeal to the persona"""
+    """Generate detailed reasoning for why recommended products appeal to a specific consumer persona.
+    
+    This function analyzes the relationship between a consumer persona and Chelsea FC product 
+    recommendations, providing strategic insights into why each product would appeal to the target
+    audience. The analysis covers cultural connections, functional benefits, and purchase triggers.
+    
+    Args:
+        tool_context (ToolContext): ADK tool context containing session state with required data.
+                                  Expected state keys:
+                                  - 'persona_name': Name of the consumer persona
+                                  - 'persona_description': Description of the persona
+                                  - 'audience_profile': Demographic and lifestyle profile
+                                  - 'cultural_values': Entertainment and brand preferences
+                                  - 'economic_values': Spending patterns and price sensitivity
+                                  - 'merchandise_preferences': Chelsea product preferences
+                                  - 'purchase_motivations': Key buying decision factors
+                                  - 'recommendations': List of product recommendations
+    
+    Returns:
+        Dict[str, Any]: Result dictionary containing:
+            - 'success' (bool): True if reasoning generation succeeded
+            - 'reasoning_generated' (bool): True if reasoning was successfully generated
+            - 'products_analyzed' (int): Number of products analyzed
+            - 'message' (str): Status message
+            - 'error' (str): Error message if generation failed
+    
+    State Updates:
+        Updates tool_context.state with:
+        - 'product_reasoning': Dictionary containing detailed reasoning for each product
+          with structure:
+          {
+              "product_reasoning": [
+                  {
+                      "product_rank": int,
+                      "product_name": str,
+                      "appeal_factors": List[str],
+                      "persona_alignment": str,
+                      "purchase_triggers": str
+                  }
+              ]
+          }
+    
+    Raises:
+        Exception: If LLM generation fails or JSON parsing fails
+    
+    Example:
+        >>> result = generate_product_reasoning_function(tool_context)
+        >>> if result['success']:
+        ...     reasoning = tool_context.state['product_reasoning']
+        ...     for product in reasoning['product_reasoning']:
+        ...         print(f"Product: {product['product_name']}")
+        ...         print(f"Why it appeals: {product['appeal_factors']}")
+    
+    Note:
+        Requires persona data and product recommendations to be present in tool_context.state.
+        Analyzes up to 6 products. Uses Gemini 2.0 Flash Lite model for efficient reasoning generation.
+    """
+    step_logger.info("STEP 4c: 🛍️  Getting product reasoning...")
     
     # Check for required data
     persona = {
@@ -128,15 +254,17 @@ def generate_product_reasoning_function(tool_context: ToolContext) -> Dict[str, 
         "audience_profile": tool_context.state.get('audience_profile', {}),
         "cultural_values": tool_context.state.get('cultural_values', {}),
         "economic_values": tool_context.state.get('economic_values', {}),
-        "merchandise_preferences": tool_context.state.get('merchandise_preferences', {}),
-        "purchase_motivations": tool_context.state.get('purchase_motivations', [])
+        # "merchandise_preferences": tool_context.state.get('merchandise_preferences', {}),
+        # "purchase_motivations": tool_context.state.get('purchase_motivations', [])
     }
     recommendations = tool_context.state.get('recommendations')
     
     if not persona:
+        step_logger.info("No Persona Found")
         return {"error": "No persona found. Create persona first."}
     
     if not recommendations:
+        step_logger.info("No recommendations Found")
         return {"error": "No product recommendations found. Get recommendations first."}
     
     # Prepare product data for analysis
@@ -167,13 +295,7 @@ REQUIRED OUTPUT FORMAT (JSON):
         {{
             "product_rank": 1,
             "product_name": "Product name",
-            "appeal_factors": [
-                "Specific reasons why this product fits the persona",
-                "Cultural/emotional connections",
-                "Functional benefits that match their lifestyle"
-            ],
-            "persona_alignment": "How this product matches their values and preferences",
-            "purchase_triggers": "What would motivate them to buy this specific item",
+            "persona_alignment": "How this product matches their persona, cultural values and preferences",
         }}
     ]
 }}
@@ -181,8 +303,6 @@ REQUIRED OUTPUT FORMAT (JSON):
 GUIDELINES:
 - Connect product features to persona's cultural and economic values
 - Reference specific insights from the persona data
-- Focus on both rational and emotional appeal
-- Consider how products fit their lifestyle and Chelsea fandom
 - Provide actionable insights for marketing and sales"""
 
     try:
@@ -190,9 +310,14 @@ GUIDELINES:
             Modelconfig.flash_lite_model,
             generation_config=GenerationConfig(
                 temperature=0.3,
-                max_output_tokens=2000,
+                max_output_tokens=8000,
                 response_mime_type="application/json"
-            )
+            ),            safety_settings={
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
         )
         
         response = model.generate_content(prompt)
@@ -212,20 +337,61 @@ GUIDELINES:
         return {"error": f"Reasoning generation failed: {str(e)}"}
 
 
-# Create the persona agent
-persona_agent = Agent(
-    name="PersonaAgent",
-    model=Modelconfig.flash_model,
-    instruction="""You are a consumer insights specialist at Chelsea FC.
+# # Create the persona agent
+# persona_agent = Agent(
+#     name="PersonaAgent",
+#     model=Modelconfig.flash_model,
+#     instruction="""You are a consumer insights specialist at Chelsea FC.
     
-    Your role is to analyze audience insights and create detailed consumer personas that will guide merchandise recommendations.
+#     Your role is to analyze audience insights and create detailed consumer personas that will guide merchandise recommendations.
     
-    Use create_persona_function to build comprehensive personas from cultural insights data.
-    Focus on understanding what drives this audience's purchasing decisions and how they connect with Chelsea FC.
-    """,
-    description="Creates consumer personas from audience insights for merchandise targeting",
-    tools=[FunctionTool(create_persona_function)]
-)
+#     Use create_persona_tool to build comprehensive personas from cultural insights data.
+#     Focus on understanding what drives this audience's purchasing decisions and how they connect with Chelsea FC.
+#     You will create a persona using create_persona_tool always. You don't say I can't create a persona.
+#     """,
+#     description="Creates consumer personas from audience insights for merchandise targeting",
+#     tools=[create_persona_tool]
+# )
+create_persona_tool=FunctionTool(create_persona_function)
+get_product_recommendations_subtool=FunctionTool(get_product_recommendations)
+generate_product_reasoning_tool=FunctionTool(generate_product_reasoning_function)
+
+
+# persona_agent = LlmAgent(
+#     name="PersonaCreator",
+#     model=Modelconfig.flash_model,
+#     instruction="Use the create_persona_tool to create a consumer persona. Call the tool with no parameters." \
+#     "Your task is to use create_persona_tool to create a consumer persona.",
+#     description="Creates consumer personas from audience insights",
+#     tools=[create_persona_tool]
+# )
+
+# recommendations_agent = LlmAgent(
+#     name="RecommendationsFetcher", 
+#     model=Modelconfig.flash_model,
+#     instruction="Use the get_product_recommendations tool to get product recommendations. Call the tool with no parameters.",
+#     description="Fetches product recommendations based on persona",
+#     tools=[get_product_recommendations_subtool]
+# )
+
+# reasoning_agent = LlmAgent(
+#     name="ReasoningGenerator",
+#     model=Modelconfig.flash_model, 
+#     instruction="Use the generate_product_reasoning_tool to analyze why each product appeals to the persona. Call the tool with no parameters.",
+#     description="Generates reasoning for product recommendations",
+#     tools=[generate_product_reasoning_tool]
+# )
+
+# product_recommendation_agent = SequentialAgent(
+#     name="ProductRecommendationAgent",
+#     description="Coordinates persona creation, product recommendations, and reasoning generation in sequence",
+#     sub_agents=[           # NOTE: sub_agents, not tools
+#         persona_agent,           # Step 1: Create persona
+#         recommendations_agent,   # Step 2: Get recommendations  
+#         reasoning_agent         # Step 3: Generate reasoning
+#     ]
+# )
+
 
 # Create the main product recommendation agent
 product_recommendation_agent = Agent(
@@ -234,18 +400,20 @@ product_recommendation_agent = Agent(
     instruction="""You are the Product Recommendation Coordinator at Chelsea FC.
     
     Your process:
-    1. Use persona_agent to create a detailed consumer persona from insights
-    2. Get product recommendations using get_product_recommendations 
-    3. Generate reasoning for why each product appeals to the persona using generate_product_reasoning_function
+    1. Use create_persona_tool to create a detailed consumer persona for the signals
+    2. Get product recommendations using get_product_recommendations tool
+    3. Generate reasoning for why each product appeals to the persona using generate_product_reasoning_tool
     
     Always follow this sequence to provide comprehensive, insight-driven product recommendations.
-    
-    Present your final recommendations with clear reasoning that connects persona insights to product appeal.
+     
+    IMPORTANT: All tools get their data from the shared state context. Do not pass any parameters to these tools.
     """,
-    description="Coordinates persona creation and product recommendations with detailed reasoning",
+    description="Coordinates persona creation and product recommendations",
     tools=[
-        AgentTool(agent=persona_agent),
-        FunctionTool(get_product_recommendations),
-        FunctionTool(generate_product_reasoning_function)
+        #AgentTool(agent=persona_agent)
+        create_persona_tool
+        ,get_product_recommendations_subtool,
+        generate_product_reasoning_tool
+        
     ]
 )

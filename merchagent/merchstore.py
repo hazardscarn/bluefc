@@ -9,6 +9,7 @@ import logging
 from abc import ABC
 import vertexai
 from vertexai.language_models import TextEmbeddingModel
+from .config import SecretConfig
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,13 +58,24 @@ class ChelseaMerchandise:
         load_dotenv()
         
         # Initialize Supabase
-        self.supabase_url = os.getenv("REACT_APP_SUPABASE_URL")
-        self.supabase_key = os.getenv("SUPABASE_SECRET_KEY")
-        self.project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+        # self.supabase_url = os.getenv("REACT_APP_SUPABASE_URL")
+        # self.supabase_key = os.getenv("SUPABASE_SECRET_KEY")
+        # self.project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
         
-        if not all([self.supabase_url, self.supabase_key]):
-            raise ValueError("Missing Supabase environment variables")
-        
+        # if not all([self.supabase_url, self.supabase_key]):
+        #     raise ValueError("Missing Supabase environment variables")
+
+        # Get secrets from Secret Manager with fallbacks
+        try:
+            self.supabase_url = SecretConfig.get_supabase_url()
+            self.supabase_key = SecretConfig.get_supabase_secret_key()
+            self.project_id = SecretConfig.get_google_cloud_project()
+            
+            logger.info("✅ Successfully retrieved secrets from Secret Manager")
+        except Exception as e:
+            logger.error(f"❌ Failed to retrieve secrets: {e}")
+            raise ValueError("Missing required secrets for Supabase connection")
+
         self.supabase = create_client(self.supabase_url, self.supabase_key)
         
         # Initialize Vertex AI using your proven pattern
@@ -135,6 +147,8 @@ class ChelseaMerchandise:
         
         # Log what we achieved
         logger.info(f"🎯 Balanced diversity results:")
+        # logger.info(f"Total {target_count} used:")
+
         for ptype, count in type_counts.items():
             logger.info(f"   {ptype}: {count} products")
         
@@ -146,7 +160,7 @@ class ChelseaMerchandise:
             query_embedding = self.embedder.create(query)
             
             # Get 3x more results for diversity selection
-            initial_count = min(match_count * 3, 25)
+            initial_count = min(match_count * 3, 40)
             
             response = self.supabase.rpc(
                 'match_merchandise',

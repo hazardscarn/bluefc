@@ -5,6 +5,7 @@ in the brand analysis system.
 
 import os
 from dotenv import load_dotenv
+from src.secret_manager import get_secret
 
 load_dotenv()
 
@@ -24,4 +25,33 @@ class Modelconfig:
     # Model settings
     temperature = 0.1  # Low temperature for consistent analysis
     max_tokens = 8192  # Maximum output tokens
+
+class SecretConfig:
+    """Configuration class that handles secrets from Secret Manager with fallbacks"""
     
+    @staticmethod
+    def get_qloo_api_key() -> str:
+        """Get Qloo API key from Secret Manager or environment variable"""
+        return get_secret("qloo-api-key", "QLOO_API_KEY")
+    
+    @staticmethod
+    def get_supabase_url() -> str:
+        """Get Supabase URL from Secret Manager or environment variable"""
+        return get_secret("REACT_APP_SUPABASE_URL", "REACT_APP_SUPABASE_URL")
+    
+    @staticmethod
+    def get_supabase_secret_key() -> str:
+        """Get Supabase secret key from Secret Manager or environment variable"""
+        return get_secret("SUPABASE_SECRET_KEY", "SUPABASE_SECRET_KEY")
+    
+    @staticmethod
+    def get_google_cloud_project() -> str:
+        """Get Google Cloud Project ID from environment variable"""
+        # This can stay as env var since it's not sensitive
+        return os.getenv("GOOGLE_CLOUD_PROJECT", "energyagentai")
+    
+    @staticmethod
+    def get_google_cloud_location() -> str:
+        """Get Google Cloud Location from environment variable"""
+        # This can stay as env var since it's not sensitive
+        return os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")

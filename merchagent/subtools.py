@@ -9,11 +9,16 @@ import logging
 from google.adk.tools import ToolContext
 from datetime import datetime
 from src.qloo import QlooAPIClient, QlooSignals, QlooAudience
+from .config import SecretConfig
 
 load_dotenv()
 
-##Initiate Qloo API Client
-client = QlooAPIClient(api_key=os.getenv("QLOO_API_KEY"))
+# Initialize Qloo API Client with Secret Manager
+qloo_api_key = SecretConfig.get_qloo_api_key()
+client = QlooAPIClient(api_key=qloo_api_key)
+
+# ##Initiate Qloo API Client
+# client = QlooAPIClient(api_key=os.getenv("QLOO_API_KEY"))
 
 
 # subtools.py - Update convert_and_create_signals to include audience IDs
