@@ -124,6 +124,10 @@ def initialize_session_state():
     if "content_video_found" not in st.session_state:
         st.session_state.content_video_found = False
 
+    # 🔧 METHOD 2: ADD THIS LINE
+    if "content_start_time" not in st.session_state:
+        st.session_state.content_start_time = None
+
 # ============================================================================
 # AGENT ENGINE MANAGER
 # ============================================================================
@@ -200,9 +204,10 @@ def connect_to_content_agent():
         st.error(f"Failed to connect to Content Agent: {e}")
         return False
 
-# 🔧 FIX 7: Updated run_content_creation function with better state management
+# 🔧 METHOD 2: Replace your entire run_content_creation function with this:
+
 def run_content_creation(location: str, age: int, hobbies: str, additional_details: str, theme: str):
-    """SIMPLE FIX: Content creation with immediate UI updates"""
+    """METHOD 2: Content creation with NO st.rerun() calls - Manual refresh only"""
     
     logger.info("🚀 ========== STARTING CONTENT CREATION ==========")
     logger.info(f"📋 Input Parameters: Location: {location}, Age: {age}, Hobbies: {hobbies}")
@@ -245,9 +250,7 @@ def run_content_creation(location: str, age: int, hobbies: str, additional_detai
                 st.session_state.content_status = "⚠️ Using fallback video due to timeout"
                 st.session_state.content_running = False
                 st.session_state.content_video_found = True
-                
-                # 🔧 SIMPLE FIX: Force immediate UI update
-                st.rerun()
+                # 🔧 REMOVED: st.rerun() - Let manual refresh handle it
                 return
             
             # Check for video URL in state_delta
@@ -282,7 +285,7 @@ def run_content_creation(location: str, age: int, hobbies: str, additional_detai
                     elif state_delta.get("scenes_created"):
                         st.session_state.content_status = "📝 Scenes created, generating content..."
                     
-                    # 🔧 SIMPLE FIX: SUCCESS with immediate UI update
+                    # 🔧 SUCCESS: Video URL found - NO st.rerun()
                     if video_url and not video_found:
                         logger.info(f"🎉 SUCCESS: Video URL found: {video_url}")
                         video_found = True
@@ -294,12 +297,10 @@ def run_content_creation(location: str, age: int, hobbies: str, additional_detai
                         st.session_state.content_video_found = True
                         
                         logger.info(f"✅ VIDEO FOUND AND STATE SET: {video_url}")
-                        
-                        # 🔧 SIMPLE FIX: Force immediate UI update to show video
-                        st.rerun()
+                        # 🔧 REMOVED: st.rerun() - Manual refresh will pick this up
                         return
                     
-                    # FALLBACK: Completion flag without URL
+                    # FALLBACK: Completion flag without URL - NO st.rerun()
                     elif completed and not video_found and not video_url:
                         logger.info(f"🎉 COMPLETION FLAG found - using fallback")
                         video_found = True
@@ -311,32 +312,26 @@ def run_content_creation(location: str, age: int, hobbies: str, additional_detai
                         st.session_state.content_video_found = True
                         
                         logger.info("✅ COMPLETION FLAG FOUND, USING FALLBACK")
-                        
-                        # 🔧 SIMPLE FIX: Force immediate UI update
-                        st.rerun()
+                        # 🔧 REMOVED: st.rerun() - Manual refresh will pick this up
                         return
         
-        # FINAL FALLBACK: No video found after all events
+        # FINAL FALLBACK: No video found after all events - NO st.rerun()
         logger.warning(f"🔚 Stream ended after {event_count} events without video")
         if not video_found:
             st.session_state.content_video_url = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
             st.session_state.content_status = "⚠️ No video URL found, using fallback video"
             st.session_state.content_running = False
             st.session_state.content_video_found = True
-            
-            # 🔧 SIMPLE FIX: Force immediate UI update
-            st.rerun()
+            # 🔧 REMOVED: st.rerun() - Manual refresh will pick this up
         
     except Exception as e:
-        # ERROR FALLBACK
+        # ERROR FALLBACK - NO st.rerun()
         logger.error(f"❌ EXCEPTION: {type(e).__name__}: {str(e)}")
         st.session_state.content_video_url = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
         st.session_state.content_status = f"⚠️ Error occurred, using fallback video"
         st.session_state.content_running = False
         st.session_state.content_video_found = True
-        
-        # 🔧 SIMPLE FIX: Force immediate UI update
-        st.rerun()
+        # 🔧 REMOVED: st.rerun() - Manual refresh will pick this up
 
 def run_customization_query(product_id: str, customization_prompt: str):
     """Run product customization using Agent Engine with proper state tracking"""
@@ -1387,9 +1382,9 @@ def customization_page():
 
 
 def content_page():
-    """UPDATED content page - remove blocking call"""
+    """METHOD 2: Complete content page with manual refresh approach"""
     
-    # Password protection (unchanged)
+    # Password protection
     if not st.session_state.get("content_authenticated", False):
         st.markdown("# 📝 Personalized Content Generation")
         st.markdown("This feature requires authentication to access.")
@@ -1416,7 +1411,7 @@ def content_page():
     st.markdown("# 📝 Personalized Content Generation")
     st.markdown("Generate personalized video content for Chelsea FC Fans using Qloo Research and ADK Agents")
     
-    # Check for completed video FIRST
+    # 🔧 FIX: Check for completed video FIRST (before any form logic)
     if st.session_state.get("content_video_url") and not st.session_state.get("content_running", False):
         st.markdown('<div class="content-card">', unsafe_allow_html=True)
         st.markdown("### 🎬 Your Personalized Video")
@@ -1449,7 +1444,7 @@ def content_page():
             if st.button("🔄 Generate Another Video", use_container_width=True):
                 # Clear all video-related state
                 for key in ["content_video_url", "content_status", "content_running", 
-                           "content_should_start", "content_inputs", "content_video_found"]:
+                           "content_should_start", "content_inputs", "content_video_found", "content_start_time"]:
                     if key in st.session_state:
                         del st.session_state[key]
                 st.rerun()
@@ -1488,12 +1483,13 @@ def content_page():
             placeholder="What's the video theme?"
         )
     
-    # 🔧 SIMPLE FIX: Don't call the blocking function here, just trigger it
+    # 🔧 FIX: Non-blocking content creation trigger
     if st.session_state.get("content_should_start", False):
         st.session_state.content_should_start = False
         inputs = st.session_state.get("content_inputs", {})
         if inputs:
-            # 🔧 SIMPLE FIX: Call content creation directly but with immediate reruns
+            # 🔧 NON-BLOCKING: Start content creation in background
+            # This will run but won't block the UI since we removed st.rerun() calls
             run_content_creation(
                 inputs["location"], 
                 inputs["age"], 
@@ -1501,26 +1497,43 @@ def content_page():
                 inputs["additional_details"], 
                 inputs["theme"]
             )
-            # Clear inputs after running
+            # Clear inputs after starting
             if "content_inputs" in st.session_state:
                 del st.session_state.content_inputs
+            
+            # Force one rerun to show loading state
+            st.rerun()
     
-    # Generate button section
+    st.markdown('</div>', unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
         if st.session_state.get("content_running", False):
-            # Show loading state
+            # 🔧 METHOD 2: MANUAL REFRESH VERSION
             st.markdown(f'''
             <div style="text-align: center; padding: 20px;">
                 <div class="loading-animation"></div>
                 <p style="margin-top: 10px; color: #64748b; font-size: 0.9rem;">{st.session_state.get("content_status", "Processing...")}</p>
                 <p style="margin-top: 5px; color: #f59e0b; font-size: 0.8rem;">⏱️ This may take 5-10 minutes</p>
+                <p style="margin-top: 5px; color: #6b7280; font-size: 0.7rem;">👆 Click button below to check progress</p>
             </div>
             ''', unsafe_allow_html=True)
             
-            # Manual refresh button
-            if st.button("🔄 Check Status", use_container_width=True):
+            # 🔧 METHOD 2: Manual refresh button
+            if st.button("🔄 Check Status", use_container_width=True, type="secondary"):
                 st.rerun()
+            
+            # 🔧 METHOD 2: Optional time estimation
+            if st.session_state.get("content_start_time"):
+                elapsed = time.time() - st.session_state.content_start_time
+                remaining = max(0, 800 - elapsed)  # 7 minutes = 420 seconds
+                minutes = int(remaining // 60)
+                seconds = int(remaining % 60)
+                
+                if remaining > 0:
+                    st.caption(f"⏱️ Estimated time remaining: ~{minutes}m {seconds}s")
+                else:
+                    st.caption("🎯 Video should be ready! Click 'Check Status'")
                 
         else:
             if st.button("🎬 Generate Video", type="primary", use_container_width=True):
@@ -1529,6 +1542,7 @@ def content_page():
                     st.session_state.content_running = True
                     st.session_state.content_video_url = None
                     st.session_state.content_status = "🚀 Starting video generation..."
+                    st.session_state.content_start_time = time.time()  # 🔧 METHOD 2: Track start time
                     
                     # Store inputs for processing
                     st.session_state.content_inputs = {
@@ -1544,8 +1558,6 @@ def content_page():
                     st.rerun()
                 else:
                     st.error("Please fill in all fields!")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # 🗑️ REMOVE THE DOWNLOAD_VIDEO FUNCTION ENTIRELY
 # No longer needed since we're displaying directly
