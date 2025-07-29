@@ -307,6 +307,49 @@ def style_component():
     return style
 
 
+def extract_video_url_from_state(state_data: dict) -> str:
+    """
+    Extract video URL from any possible state structure
+    Returns the fallback URL if nothing is found
+    """
+    fallback_url = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
+    
+    if not state_data:
+        return fallback_url
+    
+    # METHOD 1: Direct keys in state
+    video_url = (state_data.get("final_video_url") or 
+                state_data.get("output_video_url") or
+                state_data.get("video_url") or
+                state_data.get("public_url"))
+    
+    if video_url:
+        print(f"✅ Found video URL in direct keys: {video_url}")
+        return video_url
+    
+    # METHOD 2: Inside video_metadata
+    if state_data.get("video_metadata"):
+        video_metadata = state_data["video_metadata"]
+        video_url = (video_metadata.get("output_video_url") or
+                    video_metadata.get("final_video_url") or
+                    video_metadata.get("video_url"))
+        
+        if video_url:
+            print(f"✅ Found video URL in video_metadata: {video_url}")
+            return video_url
+    
+    # METHOD 3: Check nested structures
+    for key, value in state_data.items():
+        if isinstance(value, dict):
+            nested_url = extract_video_url_from_state(value)
+            if nested_url != fallback_url:  # Found something other than fallback
+                print(f"✅ Found video URL in nested key '{key}': {nested_url}")
+                return nested_url
+    
+    print(f"⚠️ No video URL found, using fallback: {fallback_url}")
+    return fallback_url
+
+
 def render_cultural_insights():
     """Render cultural insights in expandable sections with enhanced styling"""
     results = st.session_state.results
