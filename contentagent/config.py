@@ -55,3 +55,26 @@ class SecretConfig:
         """Get Google Cloud Location from environment variable"""
         # This can stay as env var since it's not sensitive
         return os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+    
+class Settings:
+    """Configuration settings for the video generation system."""
+    
+    # Google Cloud Configuration
+    GOOGLE_CLOUD_PROJECT: str = os.getenv("GOOGLE_CLOUD_PROJECT", "energyagentai")
+    GOOGLE_CLOUD_LOCATION: str = "us-central1"
+    GOOGLE_GENAI_USE_VERTEXAI: bool = True
+    GCS_BUCKET_NAME = "bluefc_content_creation"
+    
+    
+
+    @classmethod
+    def get_gcs_bucket_url(cls, path: str = "") -> str:
+        """Generate GCS bucket URL for a given path."""
+        base_url = f"gs://{cls.GCS_BUCKET_NAME}"
+        return f"{base_url}/{path}" if path else base_url
+    
+    @classmethod
+    def get_public_gcs_url(cls, path: str) -> str:
+        """Generate public GCS URL for a given path."""
+        return f"https://storage.googleapis.com/{cls.GCS_BUCKET_NAME}/{path}"
+
