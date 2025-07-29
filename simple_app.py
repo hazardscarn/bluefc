@@ -143,39 +143,39 @@ def connect_to_agent_engine():
         st.error(f"Failed to connect to Agent Engine: {e}")
         return False
 
-def download_video(video_url: str) -> Optional[str]:
-    """Download video from URL"""
-    if not video_url:
-        return None
+# def download_video(video_url: str) -> Optional[str]:
+#     """Download video from URL"""
+#     if not video_url:
+#         return None
     
-    try:
-        temp_dir = tempfile.mkdtemp()
-        video_filename = f"chelsea_video_{uuid.uuid4().hex[:8]}.mp4"
-        local_video_path = os.path.join(temp_dir, video_filename)
+#     try:
+#         temp_dir = tempfile.mkdtemp()
+#         video_filename = f"chelsea_video_{uuid.uuid4().hex[:8]}.mp4"
+#         local_video_path = os.path.join(temp_dir, video_filename)
         
-        # Download with timeout and proper headers
-        response = requests.get(
-            video_url, 
-            stream=True, 
-            timeout=120,  # 2 minute timeout
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        )
-        response.raise_for_status()
+#         # Download with timeout and proper headers
+#         response = requests.get(
+#             video_url, 
+#             stream=True, 
+#             timeout=120,  # 2 minute timeout
+#             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+#         )
+#         response.raise_for_status()
         
-        # Write video file
-        with open(local_video_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
+#         # Write video file
+#         with open(local_video_path, 'wb') as f:
+#             for chunk in response.iter_content(chunk_size=8192):
+#                 if chunk:
+#                     f.write(chunk)
         
-        # Verify file was created and has content
-        if os.path.exists(local_video_path) and os.path.getsize(local_video_path) > 1000:  # At least 1KB
-            return local_video_path
-        return None
+#         # Verify file was created and has content
+#         if os.path.exists(local_video_path) and os.path.getsize(local_video_path) > 1000:  # At least 1KB
+#             return local_video_path
+#         return None
         
-    except Exception as e:
-        print(f"Error downloading video: {e}")  # For debugging
-        return None
+#     except Exception as e:
+#         print(f"Error downloading video: {e}")  # For debugging
+#         return None
 
 def connect_to_content_agent():
     """Connect to the content creation Agent Engine"""
@@ -1144,10 +1144,203 @@ def customization_page():
 
 # FIXED content_page() function - Shows loading state properly
 
-def content_page():
-    """Enhanced content page with FIXED loading state display"""
+# def content_page():
+#     """Enhanced content page with FIXED loading state display"""
     
-    # Password protection (unchanged)
+#     # Password protection (unchanged)
+#     if not st.session_state.get("content_authenticated", False):
+#         st.markdown("# 📝 Personalized Content Generation")
+#         st.markdown("This feature requires authentication to access.")
+        
+#         st.markdown('<div class="content-card">', unsafe_allow_html=True)
+#         st.markdown("### 🔐 Access Required")
+        
+#         col1, col2, col3 = st.columns([1, 2, 1])
+#         with col2:
+#             password = st.text_input("Enter Password:", type="password", placeholder="Enter access code")
+            
+#             if st.button("🔓 Access Content Creation", type="primary", use_container_width=True):
+#                 if password == "ColdPalmer20":
+#                     st.session_state.content_authenticated = True
+#                     st.success("✅ Access granted! Redirecting...")
+#                     time.sleep(1)
+#                     st.rerun()
+#                 else:
+#                     st.error("❌ Incorrect password. Please try again.")
+        
+#         st.markdown('</div>', unsafe_allow_html=True)
+#         return
+    
+#     st.markdown("# 📝 Personalized Content Generation")
+#     st.markdown("Generate personalized video content for Chelsea FC Fans using Qloo Research and ADK Agents")
+    
+#     # Content creation form
+#     st.markdown('<div class="content-card">', unsafe_allow_html=True)
+#     st.markdown("### 🎯 Tell us about yourself")
+    
+#     col1, col2 = st.columns(2)
+    
+#     with col1:
+#         location = st.text_input("📍 Location", value="Toronto", placeholder="Enter your city")
+#         age = st.number_input("🎂 Age", value=30, min_value=13, max_value=100, step=1)
+#         hobbies = st.text_input("🏃 Hobbies", value="travel, hiking", placeholder="e.g., travel, hiking, photography")
+    
+#     with col2:
+#         additional_details = st.text_area(
+#             "💼 Additional Details", 
+#             value="Profession is Senior Data Scientist",
+#             height=70,
+#             placeholder="Tell us more about yourself"
+#         )
+#         theme = st.text_input(
+#             "⚽ Theme", 
+#             value="Getting ready for Chelsea FC 2025-26 season",
+#             placeholder="What's the video theme?"
+#         )
+    
+#     # FIXED: Auto-run content creation if triggered
+#     if st.session_state.get("content_should_start", False):
+#         # Clear the trigger flag
+#         st.session_state.content_should_start = False
+        
+#         # Get the stored inputs
+#         inputs = st.session_state.get("content_inputs", {})
+#         if inputs:
+#             # Now run content creation
+#             run_content_creation(
+#                 inputs["location"], 
+#                 inputs["age"], 
+#                 inputs["hobbies"], 
+#                 inputs["additional_details"], 
+#                 inputs["theme"]
+#             )
+            
+#             # Clear inputs after running
+#             if "content_inputs" in st.session_state:
+#                 del st.session_state.content_inputs
+    
+#     # FIXED: Generate button section
+#     col1, col2, col3 = st.columns([2, 1, 2])
+#     with col2:
+#         if st.session_state.content_running:
+#             st.markdown(f'''
+#             <div style="text-align: center; padding: 20px;">
+#                 <div class="loading-animation"></div>
+#                 <p style="margin-top: 10px; color: #64748b; font-size: 0.9rem;">{st.session_state.content_status}</p>
+#                 <p style="margin-top: 5px; color: #f59e0b; font-size: 0.8rem;">⏱️ This may take 5-10 minutes</p>
+#                 <p style="margin-top: 5px; color: #6b7280; font-size: 0.7rem;">Auto-refreshing every 3 seconds...</p>
+#             </div>
+#             ''', unsafe_allow_html=True)
+            
+#             # Auto-refresh while running and no video found
+#             if not st.session_state.content_video_url:
+#                 time.sleep(3)
+#                 st.rerun()
+                
+#         else:
+#             if st.button("🎬 Generate Video", type="primary", use_container_width=True):
+#                 if all([location.strip(), age, hobbies.strip(), additional_details.strip(), theme.strip()]):
+#                     # FIXED: Set running state and store inputs for next cycle
+#                     st.session_state.content_running = True
+#                     st.session_state.content_video_url = None
+#                     st.session_state.content_status = "🚀 Starting video generation..."
+                    
+#                     # Store inputs for the next render cycle
+#                     st.session_state.content_inputs = {
+#                         "location": location,
+#                         "age": age,
+#                         "hobbies": hobbies,
+#                         "additional_details": additional_details,
+#                         "theme": theme
+#                     }
+                    
+#                     # Set flag to start content creation in next cycle
+#                     st.session_state.content_should_start = True
+                    
+#                     # Rerun immediately to show loading state
+#                     st.rerun()
+#                 else:
+#                     st.error("Please fill in all fields!")
+    
+#     st.markdown('</div>', unsafe_allow_html=True)
+    
+#     # Display video results (unchanged)
+#     if st.session_state.content_video_url and not st.session_state.content_running:
+#         st.markdown('<div class="content-card">', unsafe_allow_html=True)
+#         st.markdown("### 🎬 Your Personalized Video")
+        
+#         # Show video URL for debugging
+#         # with st.expander("🔍 Debug Info", expanded=False):
+#         #     st.code(f"Video URL: {st.session_state.content_video_url}")
+#         #     st.code(f"Status: {st.session_state.content_status}")
+        
+#         with st.spinner("📥 Downloading video from cloud storage..."):
+#             video_path = download_video(st.session_state.content_video_url)
+        
+#         if video_path:
+#             st.video(video_path)
+            
+#             with open(video_path, 'rb') as video_file:
+#                 st.download_button(
+#                     label="📥 Download Video",
+#                     data=video_file.read(),
+#                     file_name=f"chelsea_video_{uuid.uuid4().hex[:8]}.mp4",
+#                     mime="video/mp4",
+#                     type="primary",
+#                     use_container_width=True
+#                 )
+            
+#             # Show different success messages based on source
+#             if "fallback" in st.session_state.content_status.lower():
+#                 st.markdown('<div class="success-callout">🎉 Your Chelsea FC video is ready! (Using fallback video as demonstration)</div>', unsafe_allow_html=True)
+#             else:
+#                 st.markdown('<div class="success-callout">🎉 Your personalized Chelsea FC video is ready!</div>', unsafe_allow_html=True)
+            
+#             if st.button("🔄 Generate Another Video", use_container_width=True):
+#                 st.session_state.content_video_url = None
+#                 st.session_state.content_status = ""
+#                 st.session_state.content_running = False
+#                 # Clear any leftover flags
+#                 st.session_state.content_should_start = False
+#                 if "content_inputs" in st.session_state:
+#                     del st.session_state.content_inputs
+#                 st.rerun()
+#         else:
+#             st.error("❌ Failed to download video. Please try again.")
+#             if st.button("🔄 Try Again", use_container_width=True):
+#                 st.session_state.content_video_url = None
+#                 st.session_state.content_status = ""
+#                 st.session_state.content_running = False
+#                 st.session_state.content_should_start = False
+#                 if "content_inputs" in st.session_state:
+#                     del st.session_state.content_inputs
+#                 st.rerun()
+        
+#         st.markdown('</div>', unsafe_allow_html=True)
+    
+#     # Show error state
+#     elif st.session_state.content_status.startswith("❌") and not st.session_state.content_running:
+#         st.markdown('<div class="content-card">', unsafe_allow_html=True)
+#         st.markdown("### ❌ Video Generation Failed")
+#         st.error(st.session_state.content_status)
+        
+#         if st.button("🔄 Try Again", use_container_width=True):
+#             st.session_state.content_video_url = None
+#             st.session_state.content_status = ""
+#             st.session_state.content_running = False
+#             st.session_state.content_should_start = False
+#             if "content_inputs" in st.session_state:
+#                 del st.session_state.content_inputs
+#             st.rerun()
+        
+#         st.markdown('</div>', unsafe_allow_html=True)
+
+
+
+def content_page():
+    """Simplified content page with direct video display and debugging"""
+    
+    # Password protection
     if not st.session_state.get("content_authenticated", False):
         st.markdown("# 📝 Personalized Content Generation")
         st.markdown("This feature requires authentication to access.")
@@ -1198,15 +1391,11 @@ def content_page():
             placeholder="What's the video theme?"
         )
     
-    # FIXED: Auto-run content creation if triggered
+    # Auto-run content creation if triggered
     if st.session_state.get("content_should_start", False):
-        # Clear the trigger flag
         st.session_state.content_should_start = False
-        
-        # Get the stored inputs
         inputs = st.session_state.get("content_inputs", {})
         if inputs:
-            # Now run content creation
             run_content_creation(
                 inputs["location"], 
                 inputs["age"], 
@@ -1214,12 +1403,10 @@ def content_page():
                 inputs["additional_details"], 
                 inputs["theme"]
             )
-            
-            # Clear inputs after running
             if "content_inputs" in st.session_state:
                 del st.session_state.content_inputs
     
-    # FIXED: Generate button section
+    # Generate button section
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
         if st.session_state.content_running:
@@ -1232,7 +1419,6 @@ def content_page():
             </div>
             ''', unsafe_allow_html=True)
             
-            # Auto-refresh while running and no video found
             if not st.session_state.content_video_url:
                 time.sleep(3)
                 st.rerun()
@@ -1240,12 +1426,10 @@ def content_page():
         else:
             if st.button("🎬 Generate Video", type="primary", use_container_width=True):
                 if all([location.strip(), age, hobbies.strip(), additional_details.strip(), theme.strip()]):
-                    # FIXED: Set running state and store inputs for next cycle
                     st.session_state.content_running = True
                     st.session_state.content_video_url = None
                     st.session_state.content_status = "🚀 Starting video generation..."
                     
-                    # Store inputs for the next render cycle
                     st.session_state.content_inputs = {
                         "location": location,
                         "age": age,
@@ -1254,60 +1438,59 @@ def content_page():
                         "theme": theme
                     }
                     
-                    # Set flag to start content creation in next cycle
                     st.session_state.content_should_start = True
-                    
-                    # Rerun immediately to show loading state
                     st.rerun()
                 else:
                     st.error("Please fill in all fields!")
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Display video results (unchanged)
+    # 🎬 SIMPLIFIED VIDEO DISPLAY SECTION
     if st.session_state.content_video_url and not st.session_state.content_running:
         st.markdown('<div class="content-card">', unsafe_allow_html=True)
         st.markdown("### 🎬 Your Personalized Video")
         
-        # Show video URL for debugging
-        # with st.expander("🔍 Debug Info", expanded=False):
-        #     st.code(f"Video URL: {st.session_state.content_video_url}")
-        #     st.code(f"Status: {st.session_state.content_status}")
+        # 🔍 DEBUG SECTION - Always show for troubleshooting
+        st.markdown("#### 🔍 Debug Information")
+        st.code(f"Video URL: {st.session_state.content_video_url}")
+        st.code(f"Generation Status: {st.session_state.content_status}")
+        st.code(f"Content Running: {st.session_state.content_running}")
         
-        with st.spinner("📥 Downloading video from cloud storage..."):
-            video_path = download_video(st.session_state.content_video_url)
-        
-        if video_path:
-            st.video(video_path)
-            
-            with open(video_path, 'rb') as video_file:
-                st.download_button(
-                    label="📥 Download Video",
-                    data=video_file.read(),
-                    file_name=f"chelsea_video_{uuid.uuid4().hex[:8]}.mp4",
-                    mime="video/mp4",
-                    type="primary",
-                    use_container_width=True
-                )
-            
-            # Show different success messages based on source
-            if "fallback" in st.session_state.content_status.lower():
-                st.markdown('<div class="success-callout">🎉 Your Chelsea FC video is ready! (Using fallback video as demonstration)</div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="success-callout">🎉 Your personalized Chelsea FC video is ready!</div>', unsafe_allow_html=True)
-            
-            if st.button("🔄 Generate Another Video", use_container_width=True):
-                st.session_state.content_video_url = None
-                st.session_state.content_status = ""
-                st.session_state.content_running = False
-                # Clear any leftover flags
-                st.session_state.content_should_start = False
-                if "content_inputs" in st.session_state:
-                    del st.session_state.content_inputs
-                st.rerun()
+        # Check if URL is valid
+        if st.session_state.content_video_url.startswith("http"):
+            st.success("✅ Valid video URL detected")
         else:
-            st.error("❌ Failed to download video. Please try again.")
-            if st.button("🔄 Try Again", use_container_width=True):
+            st.error("❌ Invalid video URL format")
+        
+        # 🎥 DIRECT VIDEO DISPLAY - No download needed
+        st.markdown("#### 🎥 Video Player")
+        try:
+            st.video(st.session_state.content_video_url)
+            st.success("🎉 Video displayed successfully!")
+            
+            # Show video source info
+            if "fallback" in st.session_state.content_status.lower():
+                st.info("📺 Showing demo video (fallback)")
+            else:
+                st.info("📺 Showing your personalized video")
+                
+        except Exception as e:
+            st.error(f"❌ Video display error: {str(e)}")
+            st.markdown("**Troubleshooting:**")
+            st.markdown("1. Check if the video URL is accessible")
+            st.markdown("2. Try opening the URL in a new browser tab")
+            st.markdown("3. Check browser console for errors")
+            
+            # Show clickable link as backup
+            st.markdown(f"🔗 **Direct link:** [Open Video]({st.session_state.content_video_url})")
+        
+        # 🔄 ACTION BUTTONS
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🔄 Generate Another Video", use_container_width=True):
+                # Reset all states
                 st.session_state.content_video_url = None
                 st.session_state.content_status = ""
                 st.session_state.content_running = False
@@ -1315,14 +1498,29 @@ def content_page():
                 if "content_inputs" in st.session_state:
                     del st.session_state.content_inputs
                 st.rerun()
+        
+        with col2:
+            if st.button("🔗 Open in New Tab", use_container_width=True):
+                st.markdown(f"[🎬 Open Video]({st.session_state.content_video_url})")
+        
+        with col3:
+            if st.button("📋 Copy URL", use_container_width=True):
+                st.code(st.session_state.content_video_url)
+                st.info("Copy the URL above")
         
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # Show error state
+    # Show error state if generation failed
     elif st.session_state.content_status.startswith("❌") and not st.session_state.content_running:
         st.markdown('<div class="content-card">', unsafe_allow_html=True)
         st.markdown("### ❌ Video Generation Failed")
         st.error(st.session_state.content_status)
+        
+        # Show debug info for failed generation
+        st.markdown("#### 🔍 Debug Information")
+        st.code(f"Status: {st.session_state.content_status}")
+        st.code(f"Video URL: {st.session_state.content_video_url}")
+        st.code(f"Running: {st.session_state.content_running}")
         
         if st.button("🔄 Try Again", use_container_width=True):
             st.session_state.content_video_url = None
@@ -1334,6 +1532,13 @@ def content_page():
             st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
+
+# 🗑️ REMOVE THE DOWNLOAD_VIDEO FUNCTION ENTIRELY
+# No longer needed since we're displaying directly
+
+# You can delete this function from your code:
+# def download_video(video_url: str) -> Optional[str]:
+#     # DELETE THIS ENTIRE FUNCTION
 
 
 
