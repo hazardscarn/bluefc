@@ -1,4 +1,4 @@
-# enhanced_chelsea_app.py - Fixed Chelsea FC Merchandise Agent
+# enhanced_chelsea_app.py - Fixed Chelsea FC Merchandise Agent with Async Video Generation + Comprehensive Logging
 import streamlit as st
 import time
 import uuid
@@ -8,6 +8,7 @@ import tempfile
 import os
 from typing import Dict, List, Any, Optional
 import logging
+from datetime import datetime, timedelta
 from app_components import render_cultural_insights,style_component
 
 # Agent Engine imports
@@ -16,6 +17,19 @@ try:
     AGENT_ENGINE_AVAILABLE = True
 except ImportError:
     AGENT_ENGINE_AVAILABLE = False
+
+# ============================================================================
+# ENHANCED LOGGING CONFIGURATION
+# ============================================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+    ]
+)
+logger = logging.getLogger(__name__)
+logger.info("🚀 Starting Blue FC AI Studio application")
 
 # ============================================================================
 # CONFIGURATION
@@ -28,8 +42,11 @@ RESOURCE_NAME = f"projects/{PROJECT_ID}/locations/{LOCATION}/reasoningEngines/{R
 # Content Creation Agent
 CONTENT_RESOURCE_ID = "5314625792297140224"
 CONTENT_RESOURCE_NAME = f"projects/{PROJECT_ID}/locations/{LOCATION}/reasoningEngines/{CONTENT_RESOURCE_ID}"
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+logger.info(f"📋 Configuration loaded - Project: {PROJECT_ID}, Location: {LOCATION}")
+logger.info(f"🤖 Main Agent Resource: {RESOURCE_ID}")
+logger.info(f"🎬 Content Agent Resource: {CONTENT_RESOURCE_ID}")
+
 # ============================================================================
 # PAGE CONFIGURATION
 # ============================================================================
@@ -39,345 +56,514 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+logger.info("📱 Streamlit page configuration set")
 
 # ============================================================================
 # MODERN STYLING (Same as before)
 # ============================================================================
 st.markdown(style_component(), unsafe_allow_html=True)
+logger.debug("🎨 Style components loaded")
 
 # ============================================================================
 # SESSION MANAGEMENT
 # ============================================================================
 
 def initialize_session_state():
-    """Initialize all session state variables"""
+    """Initialize all session state variables with comprehensive logging"""
+    logger.info("🔧 Starting session state initialization")
+    
+    # Basic session info
     if "current_page" not in st.session_state:
         st.session_state.current_page = "home"
+        logger.info("📄 Set default page to 'home'")
     
     if "user_id" not in st.session_state:
         st.session_state.user_id = f"user_{uuid.uuid4().hex[:8]}"
+        logger.info(f"👤 Generated new user ID: {st.session_state.user_id}")
     
     if "session_id" not in st.session_state:
         st.session_state.session_id = f"session_{uuid.uuid4().hex[:8]}"
+        logger.info(f"🔐 Generated new session ID: {st.session_state.session_id}")
     
     # Analysis state
     if "agent_running" not in st.session_state:
         st.session_state.agent_running = False
+        logger.debug("🎯 Initialized agent_running = False")
     
     if "analysis_started" not in st.session_state:
         st.session_state.analysis_started = False
+        logger.debug("📊 Initialized analysis_started = False")
     
     if "results" not in st.session_state:
         st.session_state.results = {}
+        logger.debug("📈 Initialized empty results dict")
     
     if "step_status" not in st.session_state:
         st.session_state.step_status = {}
+        logger.debug("👣 Initialized empty step_status dict")
     
     if "query_to_run" not in st.session_state:
         st.session_state.query_to_run = None
+        logger.debug("❓ Initialized query_to_run = None")
     
     if "analysis_events" not in st.session_state:
         st.session_state.analysis_events = []
+        logger.debug("📋 Initialized empty analysis_events list")
     
     if "current_step" not in st.session_state:
         st.session_state.current_step = 0
+        logger.debug("🚶 Initialized current_step = 0")
     
     # Customization state
     if "customization_running" not in st.session_state:
         st.session_state.customization_running = False
+        logger.debug("🎨 Initialized customization_running = False")
     
     if "customization_results" not in st.session_state:
         st.session_state.customization_results = {}
+        logger.debug("🖼️ Initialized empty customization_results dict")
     
     if "customization_status" not in st.session_state:
         st.session_state.customization_status = ""
+        logger.debug("📱 Initialized empty customization_status")
     
-    # Agent Engine
+    # Agent Engine connections
     if "agent_app" not in st.session_state:
         st.session_state.agent_app = None
+        logger.debug("🤖 Initialized agent_app = None")
     
     if "agent_session" not in st.session_state:
         st.session_state.agent_session = None
+        logger.debug("🔗 Initialized agent_session = None")
     
-    # Content creation state
+    # Content creation state - LEGACY (keeping for compatibility)
     if "content_agent_app" not in st.session_state:
         st.session_state.content_agent_app = None
+        logger.debug("🎬 Initialized content_agent_app = None")
     
     if "content_agent_session" not in st.session_state:
         st.session_state.content_agent_session = None
+        logger.debug("🎥 Initialized content_agent_session = None")
     
-    if "content_running" not in st.session_state:
-        st.session_state.content_running = False
+    # NEW: Async video job management
+    if "video_jobs" not in st.session_state:
+        st.session_state.video_jobs = {}
+        logger.info("📹 Initialized empty video_jobs dict for async processing")
     
-    if "content_video_url" not in st.session_state:
-        st.session_state.content_video_url = None
-    
-    if "content_status" not in st.session_state:
-        st.session_state.content_status = ""
-
-    if "content_should_start" not in st.session_state:
-        st.session_state.content_should_start = False
-    
-    if "content_inputs" not in st.session_state:
-        st.session_state.content_inputs = {}
-
-    if "content_video_found" not in st.session_state:
-        st.session_state.content_video_found = False
-
-    # 🔧 METHOD 2: ADD THIS LINE
-    if "content_start_time" not in st.session_state:
-        st.session_state.content_start_time = None
+    logger.info("✅ Session state initialization completed successfully")
 
 # ============================================================================
 # AGENT ENGINE MANAGER
 # ============================================================================
 
 def connect_to_agent_engine():
-    """Connect to the deployed Agent Engine"""
+    """Connect to the deployed Agent Engine with detailed logging"""
+    logger.info("🔌 Attempting to connect to main Agent Engine")
+    
     if not AGENT_ENGINE_AVAILABLE:
-        st.error("❌ Vertex AI not available. Please install: pip install google-cloud-aiplatform[adk,agent_engines]")
+        error_msg = "❌ Vertex AI not available. Please install: pip install google-cloud-aiplatform[adk,agent_engines]"
+        logger.error(error_msg)
+        st.error(error_msg)
         return False
     
     try:
+        # Check if agent app needs initialization
         if st.session_state.agent_app is None:
+            logger.info(f"🔗 Creating agent connection to: {RESOURCE_NAME}")
             st.session_state.agent_app = agent_engines.get(RESOURCE_NAME)
+            logger.info("✅ Agent app created successfully")
+        else:
+            logger.debug("♻️ Using existing agent app connection")
         
+        # Check if session needs initialization
         if st.session_state.agent_session is None:
+            logger.info(f"🆕 Creating new agent session for user: {st.session_state.user_id}")
             session = st.session_state.agent_app.create_session(user_id=st.session_state.user_id)
             st.session_state.agent_session = session
+            logger.info(f"✅ Agent session created: {session.get('id', 'unknown')}")
+        else:
+            logger.debug(f"♻️ Using existing agent session: {st.session_state.agent_session.get('id', 'unknown')}")
         
+        logger.info("🟢 Agent Engine connection established successfully")
         return True
+        
     except Exception as e:
-        st.error(f"Failed to connect to Agent Engine: {e}")
+        error_msg = f"Failed to connect to Agent Engine: {e}"
+        logger.error(f"❌ {error_msg}", exc_info=True)
+        st.error(error_msg)
         return False
-
-# def download_video(video_url: str) -> Optional[str]:
-#     """Download video from URL"""
-#     if not video_url:
-#         return None
-    
-#     try:
-#         temp_dir = tempfile.mkdtemp()
-#         video_filename = f"chelsea_video_{uuid.uuid4().hex[:8]}.mp4"
-#         local_video_path = os.path.join(temp_dir, video_filename)
-        
-#         # Download with timeout and proper headers
-#         response = requests.get(
-#             video_url, 
-#             stream=True, 
-#             timeout=120,  # 2 minute timeout
-#             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-#         )
-#         response.raise_for_status()
-        
-#         # Write video file
-#         with open(local_video_path, 'wb') as f:
-#             for chunk in response.iter_content(chunk_size=8192):
-#                 if chunk:
-#                     f.write(chunk)
-        
-#         # Verify file was created and has content
-#         if os.path.exists(local_video_path) and os.path.getsize(local_video_path) > 1000:  # At least 1KB
-#             return local_video_path
-#         return None
-        
-#     except Exception as e:
-#         print(f"Error downloading video: {e}")  # For debugging
-#         return None
 
 def connect_to_content_agent():
-    """Connect to the content creation Agent Engine"""
+    """Connect to the content creation Agent Engine with detailed logging"""
+    logger.info("🔌 Attempting to connect to Content Agent Engine")
+    
     if not AGENT_ENGINE_AVAILABLE:
-        st.error("❌ Vertex AI not available. Please install: pip install google-cloud-aiplatform[adk,agent_engines]")
+        error_msg = "❌ Vertex AI not available. Please install: pip install google-cloud-aiplatform[adk,agent_engines]"
+        logger.error(error_msg)
+        st.error(error_msg)
         return False
     
     try:
+        # Check if content agent app needs initialization
         if st.session_state.content_agent_app is None:
+            logger.info(f"🔗 Creating content agent connection to: {CONTENT_RESOURCE_NAME}")
             st.session_state.content_agent_app = agent_engines.get(CONTENT_RESOURCE_NAME)
+            logger.info("✅ Content agent app created successfully")
+        else:
+            logger.debug("♻️ Using existing content agent app connection")
         
+        # Check if content session needs initialization
         if st.session_state.content_agent_session is None:
+            logger.info(f"🆕 Creating new content agent session for user: {st.session_state.user_id}")
             session = st.session_state.content_agent_app.create_session(user_id=st.session_state.user_id)
             st.session_state.content_agent_session = session
+            logger.info(f"✅ Content agent session created: {session.get('id', 'unknown')}")
+        else:
+            logger.debug(f"♻️ Using existing content agent session: {st.session_state.content_agent_session.get('id', 'unknown')}")
         
+        logger.info("🟢 Content Agent Engine connection established successfully")
         return True
+        
     except Exception as e:
-        st.error(f"Failed to connect to Content Agent: {e}")
+        error_msg = f"Failed to connect to Content Agent: {e}"
+        logger.error(f"❌ {error_msg}", exc_info=True)
+        st.error(error_msg)
         return False
 
-# 🔧 METHOD 2: Replace your entire run_content_creation function with this:
+# ============================================================================
+# NEW: ASYNC VIDEO GENERATION FUNCTIONS
+# ============================================================================
 
-def run_content_creation(location: str, age: int, hobbies: str, additional_details: str, theme: str):
-    """METHOD 2: Content creation with NO st.rerun() calls - Manual refresh only"""
-    
-    logger.info("🚀 ========== STARTING CONTENT CREATION ==========")
-    logger.info(f"📋 Input Parameters: Location: {location}, Age: {age}, Hobbies: {hobbies}")
+def start_video_generation_async(location: str, age: int, hobbies: str, additional_details: str, theme: str):
+    """Start video generation in background and return job info with detailed logging"""
+    logger.info("🚀 Starting async video generation process")
+    logger.info(f"📋 Input params - Location: {location}, Age: {age}, Hobbies: {hobbies}")
+    logger.debug(f"📝 Additional details: {additional_details}")
+    logger.debug(f"🎯 Theme: {theme}")
     
     if not connect_to_content_agent():
-        logger.error("❌ Failed to connect to content agent")
-        st.session_state.content_running = False
-        return
+        logger.error("❌ Failed to connect to content agent, aborting video generation")
+        return None
     
-    logger.info("✅ Content agent connected successfully")
+    # Create unique job ID
+    job_id = f"video_job_{uuid.uuid4().hex[:8]}"
+    logger.info(f"🆔 Generated job ID: {job_id}")
     
+    # Store job info in session state
+    job_data = {
+        "status": "starting",
+        "start_time": datetime.now(),
+        "video_url": None,
+        "error": None,
+        "location": location,
+        "age": age,
+        "hobbies": hobbies,
+        "additional_details": additional_details,
+        "theme": theme,
+        "progress": "Initializing video generation..."
+    }
+    
+    st.session_state.video_jobs[job_id] = job_data
+    logger.info(f"💾 Stored job data in session state for {job_id}")
+    logger.debug(f"📊 Job data: {job_data}")
+    
+    # Start the generation process asynchronously
     try:
         query = f"Age: {age}, Location: {location}, Hobbies: {hobbies}, Additional Details: {additional_details}, Theme: {theme}"
-        logger.info(f"📝 Final Query: {query}")
+        logger.info(f"📝 Generated query for agent: {query}")
         
-        st.session_state.content_status = "🎬 Generating your personalized video content..."
-        st.session_state.content_video_found = False
+        # Store the query for processing
+        st.session_state.video_jobs[job_id]["query"] = query
+        st.session_state.video_jobs[job_id]["status"] = "processing"
+        logger.info(f"🔄 Updated job {job_id} status to 'processing'")
         
-        video_found = False
-        max_events = 50
-        event_count = 0
-        start_time = time.time()
-        
-        logger.info(f"⚙️ Stream Configuration: Max events: {max_events}, Start time: {start_time}")
-        
-        for event in st.session_state.content_agent_app.stream_query(
-            user_id=st.session_state.user_id,
-            session_id=st.session_state.content_agent_session["id"],
-            message=query
-        ):
-            event_count += 1
-            elapsed = time.time() - start_time
-            
-            logger.info(f"\n📊 ========== EVENT {event_count} ({elapsed:.1f}s) ==========")
-            
-            # Safety break with timeout
-            if event_count > max_events or elapsed > 900:
-                logger.warning(f"⚠️ Timeout or max events reached")
-                st.session_state.content_video_url = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
-                st.session_state.content_status = "⚠️ Using fallback video due to timeout"
-                st.session_state.content_running = False
-                st.session_state.content_video_found = True
-                # 🔧 REMOVED: st.rerun() - Let manual refresh handle it
-                return
-            
-            # Check for video URL in state_delta
-            if "state_delta" in event.get("actions", {}) and not video_found:
-                state_delta = event["actions"]["state_delta"]
-                logger.info(f"🎯 state_delta: {bool(state_delta)}")
-                
-                if state_delta:
-                    # METHOD 1: Direct video URL keys
-                    video_url = (state_delta.get("final_video_url") or 
-                               state_delta.get("output_video_url") or
-                               state_delta.get("video_url") or
-                               state_delta.get("public_url"))
-                    
-                    # METHOD 2: Check inside video_metadata
-                    if not video_url and state_delta.get("video_metadata"):
-                        video_metadata = state_delta["video_metadata"]
-                        video_url = (video_metadata.get("output_video_url") or
-                                   video_metadata.get("final_video_url") or
-                                   video_metadata.get("video_url"))
-                    
-                    # METHOD 3: Check completion flags
-                    completed = (state_delta.get("assembly_completed") or 
-                               state_delta.get("video_ready") or
-                               state_delta.get("success"))
-                    
-                    # Update progress status
-                    if state_delta.get("images_generated"):
-                        st.session_state.content_status = "🎨 Images created, assembling video..."
-                    elif state_delta.get("audio_generated"):
-                        st.session_state.content_status = "🎤 Audio generated, creating images..."
-                    elif state_delta.get("scenes_created"):
-                        st.session_state.content_status = "📝 Scenes created, generating content..."
-                    
-                    # 🔧 SUCCESS: Video URL found - NO st.rerun()
-                    if video_url and not video_found:
-                        logger.info(f"🎉 SUCCESS: Video URL found: {video_url}")
-                        video_found = True
-                        
-                        # Set all state variables immediately
-                        st.session_state.content_video_url = video_url
-                        st.session_state.content_status = f"✅ Video generation completed! ({event_count} events)"
-                        st.session_state.content_running = False
-                        st.session_state.content_video_found = True
-                        
-                        logger.info(f"✅ VIDEO FOUND AND STATE SET: {video_url}")
-                        # 🔧 REMOVED: st.rerun() - Manual refresh will pick this up
-                        return
-                    
-                    # FALLBACK: Completion flag without URL - NO st.rerun()
-                    elif completed and not video_found and not video_url:
-                        logger.info(f"🎉 COMPLETION FLAG found - using fallback")
-                        video_found = True
-                        
-                        # Set fallback state
-                        st.session_state.content_video_url = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
-                        st.session_state.content_status = "✅ Video completed, using fallback URL"
-                        st.session_state.content_running = False
-                        st.session_state.content_video_found = True
-                        
-                        logger.info("✅ COMPLETION FLAG FOUND, USING FALLBACK")
-                        # 🔧 REMOVED: st.rerun() - Manual refresh will pick this up
-                        return
-        
-        # FINAL FALLBACK: No video found after all events - NO st.rerun()
-        logger.warning(f"🔚 Stream ended after {event_count} events without video")
-        if not video_found:
-            st.session_state.content_video_url = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
-            st.session_state.content_status = "⚠️ No video URL found, using fallback video"
-            st.session_state.content_running = False
-            st.session_state.content_video_found = True
-            # 🔧 REMOVED: st.rerun() - Manual refresh will pick this up
+        logger.info(f"✅ Successfully started async video job: {job_id}")
+        return job_id
         
     except Exception as e:
-        # ERROR FALLBACK - NO st.rerun()
-        logger.error(f"❌ EXCEPTION: {type(e).__name__}: {str(e)}")
-        st.session_state.content_video_url = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
-        st.session_state.content_status = f"⚠️ Error occurred, using fallback video"
-        st.session_state.content_running = False
-        st.session_state.content_video_found = True
-        # 🔧 REMOVED: st.rerun() - Manual refresh will pick this up
+        logger.error(f"❌ Failed to start video job {job_id}: {e}", exc_info=True)
+        st.session_state.video_jobs[job_id]["status"] = "error"
+        st.session_state.video_jobs[job_id]["error"] = str(e)
+        return job_id
+
+def process_video_job_chunk(job_id: str, max_events: int = 5):
+    """Process a small chunk of the video generation job with detailed logging"""
+    logger.debug(f"🔄 Processing chunk for job {job_id} (max {max_events} events)")
+    
+    if job_id not in st.session_state.get("video_jobs", {}):
+        logger.warning(f"⚠️ Job {job_id} not found in session state")
+        return False
+    
+    job = st.session_state.video_jobs[job_id]
+    logger.debug(f"📊 Current job status: {job['status']}")
+    
+    if job["status"] not in ["processing", "starting"]:
+        logger.debug(f"⏹️ Job {job_id} not in processing state, skipping")
+        return False  # Job already complete or failed
+    
+    try:
+        # Initialize stream if not started
+        stream_attr = f"video_stream_{job_id}"
+        count_attr = f"video_event_count_{job_id}"
+        
+        if not hasattr(st.session_state, stream_attr):
+            logger.info(f"🔗 Initializing stream for job {job_id}")
+            query = job["query"]
+            
+            stream = st.session_state.content_agent_app.stream_query(
+                user_id=st.session_state.user_id,
+                session_id=st.session_state.content_agent_session["id"],
+                message=query
+            )
+            setattr(st.session_state, stream_attr, stream)
+            setattr(st.session_state, count_attr, 0)
+            logger.info(f"✅ Stream initialized for job {job_id}")
+        else:
+            logger.debug(f"♻️ Using existing stream for job {job_id}")
+        
+        # Process a few events
+        stream = getattr(st.session_state, stream_attr)
+        event_count = getattr(st.session_state, count_attr, 0)
+        logger.debug(f"📊 Current event count for {job_id}: {event_count}")
+        
+        events_processed = 0
+        
+        try:
+            for event in stream:
+                events_processed += 1
+                event_count += 1
+                logger.debug(f"📨 Processing event {event_count} for job {job_id}")
+                
+                # Check for video URL in the event
+                if "state_delta" in event.get("actions", {}):
+                    state_delta = event["actions"]["state_delta"]
+                    if state_delta:
+                        logger.debug(f"🔍 Found state_delta in event {event_count}")
+                        
+                        # Look for video URL
+                        video_url = None
+                        possible_keys = [
+                            "final_video_url", "output_video_url", "video_url", 
+                            "public_url", "storage_url", "gcs_url"
+                        ]
+                        
+                        for key in possible_keys:
+                            if state_delta.get(key):
+                                video_url = state_delta[key]
+                                logger.info(f"🎯 Found video URL in '{key}': {video_url}")
+                                break
+                        
+                        # Check video_metadata too
+                        if not video_url and state_delta.get("video_metadata"):
+                            logger.debug("🔍 Checking video_metadata for URL")
+                            video_metadata = state_delta["video_metadata"]
+                            for key in possible_keys:
+                                if video_metadata.get(key):
+                                    video_url = video_metadata[key]
+                                    logger.info(f"🎯 Found video URL in video_metadata.{key}: {video_url}")
+                                    break
+                        
+                        # SUCCESS - Video found!
+                        if video_url:
+                            logger.info(f"🎉 SUCCESS: Video URL found for job {job_id}: {video_url}")
+                            job["status"] = "completed"
+                            job["video_url"] = video_url
+                            job["completion_time"] = datetime.now()
+                            job["progress"] = "Video generation completed!"
+                            
+                            # Clean up stream
+                            if hasattr(st.session_state, stream_attr):
+                                delattr(st.session_state, stream_attr)
+                                logger.debug(f"🧹 Cleaned up stream for job {job_id}")
+                            if hasattr(st.session_state, count_attr):
+                                delattr(st.session_state, count_attr)
+                                logger.debug(f"🧹 Cleaned up event count for job {job_id}")
+                            
+                            logger.info(f"✅ Job {job_id} completed successfully")
+                            return True  # Job complete
+                        
+                        # Update job progress info based on your agent's specific response fields
+                        progress_updated = False
+                        if state_delta.get("images_generated"):
+                            job["progress"] = "✅ Images created, assembling video..."
+                            progress_updated = True
+                            logger.info(f"📸 Images generated for job {job_id}")
+                        elif state_delta.get("audio_generated") or state_delta.get("audio_urls"):
+                            job["progress"] = "🎤 Audio generated, creating images..."
+                            progress_updated = True
+                            logger.info(f"🎵 Audio generated for job {job_id}")
+                        elif state_delta.get("scenes_created") or state_delta.get("scene_count"):
+                            job["progress"] = "📝 Scenes created, generating content..."
+                            progress_updated = True
+                            logger.info(f"🎬 Scenes created for job {job_id}")
+                        elif state_delta.get("generation_success"):
+                            job["progress"] = "🎯 Generation successful, finalizing video..."
+                            progress_updated = True
+                            logger.info(f"✨ Generation successful for job {job_id}")
+                        elif state_delta.get("assembly_completed"):
+                            job["progress"] = "🔧 Assembly completed, preparing final video..."
+                            progress_updated = True
+                            logger.info(f"🔧 Assembly completed for job {job_id}")
+                        
+                        if progress_updated:
+                            logger.info(f"📈 Updated progress for job {job_id}: {job['progress']}")
+                        
+                        # COMPLETION CHECK: Use your agent's specific completion flags
+                        completed = (state_delta.get("assembly_completed") or 
+                                   state_delta.get("generation_success") or
+                                   state_delta.get("video_ready") or
+                                   state_delta.get("success"))
+                        
+                        # FALLBACK: If we have completion flag but no video URL, use fallback
+                        if completed and not video_url:
+                            logger.info(f"🎉 COMPLETION FLAG found for job {job_id} but no video URL - using fallback")
+                            job["status"] = "completed"
+                            job["video_url"] = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
+                            job["completion_time"] = datetime.now()
+                            job["note"] = "Used fallback video (completion flag detected)"
+                            job["progress"] = "Completed with fallback video"
+                            return True
+                
+                # Break after processing max_events
+                if events_processed >= max_events:
+                    logger.debug(f"⏸️ Reached max events ({max_events}) for this chunk")
+                    break
+        
+        except StopIteration:
+            # Stream ended without finding video - use fallback
+            logger.warning(f"🔚 Stream ended for job {job_id} without video URL, using fallback")
+            job["status"] = "completed"
+            job["video_url"] = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
+            job["completion_time"] = datetime.now()
+            job["note"] = "Used fallback video"
+            job["progress"] = "Completed with fallback video"
+            logger.info(f"✅ Job {job_id} completed with fallback video")
+            return True
+        
+        # Update event count
+        setattr(st.session_state, count_attr, event_count)
+        logger.debug(f"📊 Updated event count for job {job_id}: {event_count}")
+        
+        # Check for timeout (10 minutes)
+        elapsed = datetime.now() - job["start_time"]
+        if elapsed > timedelta(minutes=10):
+            logger.warning(f"⏰ Job {job_id} timed out after 10 minutes")
+            job["status"] = "completed"
+            job["video_url"] = "https://storage.googleapis.com/bluefc_content_creation/videos/chelsea_dynamic_a96f7e3b.mp4"
+            job["completion_time"] = datetime.now()
+            job["note"] = "Timed out, used fallback video"
+            job["progress"] = "Completed with fallback video (timeout)"
+            logger.info(f"⏰ Job {job_id} completed due to timeout")
+            return True
+        
+        logger.debug(f"⏳ Job {job_id} still processing, {events_processed} events processed this chunk")
+        return False  # Job still processing
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing job {job_id}: {e}", exc_info=True)
+        job["status"] = "error"
+        job["error"] = str(e)
+        job["progress"] = f"Error: {str(e)}"
+        return True  # Job failed
+
+def cleanup_old_jobs():
+    """Clean up jobs older than 1 hour with detailed logging"""
+    if "video_jobs" not in st.session_state:
+        logger.debug("🧹 No video jobs to clean up")
+        return
+    
+    logger.debug("🧹 Starting cleanup of old video jobs")
+    cutoff_time = datetime.now() - timedelta(hours=1)
+    jobs_to_remove = []
+    
+    for job_id, job in st.session_state.video_jobs.items():
+        if job["start_time"] < cutoff_time:
+            logger.info(f"🗑️ Marking job {job_id} for removal (older than 1 hour)")
+            jobs_to_remove.append(job_id)
+            # Clean up any remaining streams
+            stream_attr = f"video_stream_{job_id}"
+            count_attr = f"video_event_count_{job_id}"
+            
+            if hasattr(st.session_state, stream_attr):
+                delattr(st.session_state, stream_attr)
+                logger.debug(f"🧹 Cleaned up stream attribute for {job_id}")
+            if hasattr(st.session_state, count_attr):
+                delattr(st.session_state, count_attr)
+                logger.debug(f"🧹 Cleaned up count attribute for {job_id}")
+    
+    for job_id in jobs_to_remove:
+        del st.session_state.video_jobs[job_id]
+        logger.info(f"🗑️ Removed old job: {job_id}")
+    
+    if jobs_to_remove:
+        logger.info(f"🧹 Cleanup completed: removed {len(jobs_to_remove)} old jobs")
+    else:
+        logger.debug("🧹 Cleanup completed: no old jobs to remove")
+
+# ============================================================================
+# EXISTING FUNCTIONS (WITH ENHANCED LOGGING)
+# ============================================================================
 
 def run_customization_query(product_id: str, customization_prompt: str):
-    """Run product customization using Agent Engine with proper state tracking"""
+    """Run product customization using Agent Engine with detailed logging"""
+    logger.info(f"🎨 Starting product customization for product: {product_id}")
+    logger.debug(f"📝 Customization prompt: {customization_prompt}")
+    
     if not connect_to_agent_engine():
+        logger.error("❌ Failed to connect to agent engine for customization")
         return
     
     try:
         st.session_state.customization_status = "🔍 Validating product and context..."
+        logger.info("🔍 Starting product validation phase")
         
         # Create customization query
         query = f'Customize product_id: "{product_id}" with the following instructions: {customization_prompt}'
+        logger.info(f"📝 Generated customization query: {query}")
         
         # Track state changes specifically for customization
         customization_state = {}
         event_count = 0
         
         st.session_state.customization_status = "🎨 Generating customized product..."
+        logger.info("🎨 Starting customization generation phase")
         
         # Stream the customization query
+        logger.debug(f"🔗 Starting stream query for user {st.session_state.user_id}")
         for event in st.session_state.agent_app.stream_query(
             user_id=st.session_state.user_id,
             session_id=st.session_state.agent_session["id"],
             message=query
         ):
             event_count += 1
+            logger.debug(f"📨 Processing customization event {event_count}")
             
             # Track state changes
             if "state_delta" in event.get("actions", {}):
                 state_delta = event["actions"]["state_delta"]
                 if state_delta:
+                    logger.debug(f"🔍 Found state_delta in event {event_count}")
                     for key, value in state_delta.items():
                         customization_state[key] = value
+                        logger.debug(f"📊 Updated customization_state[{key}]")
                         
                         # Update status based on what we're receiving
                         if key == "customized_image_url":
                             st.session_state.customization_status = "🖼️ Image generated successfully!"
+                            logger.info("🖼️ Customized image URL received")
                         elif key == "customization_reasoning":
                             st.session_state.customization_status = "🧠 Analyzing customization rationale..."
+                            logger.info("🧠 Customization reasoning received")
             
             # Check for agent responses (including error messages)
             if "content" in event:
                 for part in event["content"].get("parts", []):
                     if "text" in part:
                         text = part["text"]
+                        logger.debug(f"📝 Received text response: {text[:100]}...")
                         # Check for error messages
                         if "unable to customize" in text.lower() or "failed" in text.lower():
+                            logger.error(f"❌ Customization failed with agent response: {text}")
                             st.session_state.customization_status = "❌ Customization failed"
                             st.session_state.customization_results = {
                                 "error": text,
@@ -390,8 +576,11 @@ def run_customization_query(product_id: str, customization_prompt: str):
                             st.session_state.customization_running = False
                             return
         
+        logger.info(f"🔚 Customization stream completed after {event_count} events")
+        
         # Process final results
         if customization_state.get("customized_image_url"):
+            logger.info("✅ Customization successful - image URL found")
             st.session_state.customization_results = {
                 "success": True,
                 "customized_image_url": customization_state.get("customized_image_url", ""),
@@ -400,8 +589,10 @@ def run_customization_query(product_id: str, customization_prompt: str):
                 "product_id": product_id
             }
             st.session_state.customization_status = "✅ Customization completed successfully!"
+            logger.info(f"✅ Customization results stored for product {product_id}")
         else:
             # No customization results - likely an error
+            logger.warning("⚠️ No customized image URL found in results")
             st.session_state.customization_results = {
                 "error": "No customized image was generated. This could be due to missing context or product not found.",
                 "suggestions": [
@@ -414,8 +605,10 @@ def run_customization_query(product_id: str, customization_prompt: str):
             st.session_state.customization_status = "❌ Customization failed"
         
         st.session_state.customization_running = False
+        logger.info("🏁 Customization process completed")
         
     except Exception as e:
+        logger.error(f"❌ Customization failed with exception: {e}", exc_info=True)
         st.session_state.customization_results = {
             "error": f"Customization failed with error: {str(e)}",
             "suggestions": [
@@ -428,7 +621,8 @@ def run_customization_query(product_id: str, customization_prompt: str):
         st.session_state.customization_running = False
 
 def render_real_time_progress(results: Dict):
-    """Render real-time progress updates in center"""
+    """Render real-time progress updates with logging"""
+    logger.debug("📊 Rendering real-time progress display")
     
     col1, col2 = st.columns([1, 1])
     
@@ -438,6 +632,7 @@ def render_real_time_progress(results: Dict):
         
         # Show detected signals
         if results.get("detected_signals") and any(results["detected_signals"].values()):
+            logger.debug("📍 Rendering demographic signals")
             st.markdown("#### 📍 Demographic Signals")
             signals = results["detected_signals"]
             
@@ -453,6 +648,7 @@ def render_real_time_progress(results: Dict):
         
         # Show detected audiences
         if results.get("detected_audience_names"):
+            logger.debug(f"🎯 Rendering {len(results['detected_audience_names'])} target audiences")
             st.markdown("#### 🎯 Target Audiences")
             for audience in results["detected_audience_names"][:4]:
                 st.markdown(f'<div style="background: #f8fafc; padding: 0.4rem 0.8rem; border-radius: 8px; margin: 0.25rem 0; font-size: 0.8rem; color: #475569; border-left: 3px solid #034694;">{audience}</div>', unsafe_allow_html=True)
@@ -462,6 +658,7 @@ def render_real_time_progress(results: Dict):
         
         # Show persona if available
         if results.get("persona_name"):
+            logger.debug(f"👤 Rendering persona: {results['persona_name']}")
             st.markdown("#### 👤 Generated Persona")
             st.markdown(f'<div style="background: #f0f9ff; padding: 0.6rem 0.8rem; border-radius: 8px; margin: 0.25rem 0; font-size: 0.9rem; color: #0c4a6e; border-left: 3px solid #0ea5e9; font-weight: 600;">{results["persona_name"]}</div>', unsafe_allow_html=True)
         
@@ -487,6 +684,7 @@ def render_real_time_progress(results: Dict):
         progress = completed / len(analysis_steps)
         st.progress(progress)
         st.caption(f"{completed}/{len(analysis_steps)} steps completed")
+        logger.debug(f"📈 Progress: {completed}/{len(analysis_steps)} steps completed")
         
         # Status pills
         for step in analysis_steps:
@@ -524,30 +722,40 @@ def render_real_time_progress(results: Dict):
                     st.markdown(f'<div style="background: #ecfdf5; padding: 0.3rem 0.6rem; border-radius: 6px; margin: 0.2rem 0; font-size: 0.8rem; color: #065f46; display: inline-block; margin-right: 0.5rem;">{item_name}: {count}</div>', unsafe_allow_html=True)
 
 def check_step_completion(step_idx: int, state: Dict) -> bool:
-    """Check if analysis step is complete based on state"""
+    """Check if analysis step is complete based on state with logging"""
+    step_names = ["signals", "audiences", "insights", "persona", "products"]
+    step_name = step_names[step_idx] if step_idx < len(step_names) else f"step_{step_idx}"
+    
     if step_idx == 0:  # Signals
-        return bool(state.get("detected_signals"))
+        completed = bool(state.get("detected_signals"))
     elif step_idx == 1:  # Audiences
-        return bool(state.get("detected_audience_names"))
+        completed = bool(state.get("detected_audience_names"))
     elif step_idx == 2:  # Cultural insights
-        return bool(state.get("brand_insight"))
+        completed = bool(state.get("brand_insight"))
     elif step_idx == 3:  # Persona
-        return bool(state.get("persona_name"))
+        completed = bool(state.get("persona_name"))
     elif step_idx == 4:  # Products
-        return bool(state.get("recommendations"))
-    return False
+        completed = bool(state.get("recommendations"))
+    else:
+        completed = False
+    
+    if completed:
+        logger.debug(f"✅ Step {step_idx} ({step_name}) marked as completed")
+    
+    return completed
 
 # ============================================================================
-# UI COMPONENTS
+# UI COMPONENTS (WITH ENHANCED LOGGING)
 # ============================================================================
 
 def render_navigation():
-    """Render navigation header"""
+    """Render navigation header with logging"""
+    logger.debug("🧭 Rendering navigation header")
+    
     # Status check
     connected = st.session_state.agent_app is not None
+    logger.debug(f"🔗 Agent connection status: {'connected' if connected else 'disconnected'}")
     
-
-
     st.markdown("""
     <div class="hero-section">
         <div class="hero-title">⚽ Blue FC AI Studio ⚽</div>
@@ -585,7 +793,6 @@ def render_navigation():
     </div>
     """, unsafe_allow_html=True)
     
-
     # Center-aligned navigation pills
     col1, col2, col3 = st.columns([1, 2, 1])  # Creates centered column
     
@@ -606,29 +813,22 @@ def render_navigation():
             
             new_page = page_map[selected]
             if new_page != st.session_state.current_page:
+                logger.info(f"🧭 Navigation: {st.session_state.current_page} -> {new_page}")
                 st.session_state.current_page = new_page
                 st.rerun()
 
-def render_hero():
-    """Render hero section"""
-    st.markdown("""
-    <div class="hero-section">
-        <div class="hero-title">⚽ Chelsea FC Merchandise Agent</div>
-        <div class="hero-subtitle">
-            AI-powered personalized merchandise recommendations using Google's Agent Engine and cultural intelligence
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
 def render_analysis_results():
-    """Render analysis results"""
+    """Render analysis results with logging"""
+    logger.debug("📊 Rendering analysis results")
     results = st.session_state.results
     
     if not results:
+        logger.debug("📊 No results to render")
         return
     
     # Persona section
     if results.get("persona_name"):
+        logger.debug(f"👤 Rendering persona section: {results['persona_name']}")
         st.markdown('<div class="content-card">', unsafe_allow_html=True)
         st.markdown(f"### 👤 Persona: {results['persona_name']}")
         if results.get("persona_description"):
@@ -637,10 +837,10 @@ def render_analysis_results():
     
     # Product recommendations in 3x2 grid
     if results.get("recommendations"):
+        recommendations = results["recommendations"]
+        logger.debug(f"🛍️ Rendering {len(recommendations)} product recommendations")
         st.markdown('<div class="content-card">', unsafe_allow_html=True)
         st.markdown("### 🛍️ Product Recommendations")
-        
-        recommendations = results["recommendations"]
         
         # Create 3x2 grid (3 columns, 2 rows)
         for row in range(2):  # 2 rows
@@ -649,6 +849,7 @@ def render_analysis_results():
                 product_idx = row * 3 + col
                 if product_idx < len(recommendations):
                     product = recommendations[product_idx]
+                    logger.debug(f"🛒 Rendering product {product_idx}: {product.get('name', 'Unknown')}")
                     
                     with cols[col]:
                         # Product image
@@ -681,53 +882,22 @@ def render_analysis_results():
                                        unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
-
-# def render_cultural_insights():
-#     """Render cultural insights in expandable sections"""
-#     results = st.session_state.results
-    
-#     if any([results.get("brand_insight"), results.get("movie_insight"), results.get("artist_insight"), results.get("podcast_insight"), results.get("tag_insight")]):
-#         st.markdown('<div class="content-card">', unsafe_allow_html=True)
-#         st.markdown("### 🧠 Cultural Insights")
-        
-#         # Brand insights
-#         if results.get("brand_insight"):
-#             with st.expander("🏷️ **Brand Affinities**", expanded=False):
-#                 st.markdown(results["brand_insight"])
-        
-#         # Movie insights
-#         if results.get("movie_insight"):
-#             with st.expander("🎬 **Movie Preferences**", expanded=False):
-#                 st.markdown(results["movie_insight"])
-        
-#         # Artist insights
-#         if results.get("artist_insight"):
-#             with st.expander("🎵 **Music & Artists**", expanded=False):
-#                 st.markdown(results["artist_insight"])
-        
-#         # Podcast insights
-#         if results.get("podcast_insight"):
-#             with st.expander("🎧 **Podcast Preferences**", expanded=False):
-#                 st.markdown(results["podcast_insight"])
-        
-#         # Tag insights
-#         if results.get("tag_insight"):
-#             with st.expander("🏷️ **Cultural Tags**", expanded=False):
-#                 st.markdown(results["tag_insight"])
-        
-#         st.markdown('</div>', unsafe_allow_html=True)
+        logger.debug("✅ Completed rendering product recommendations")
 
 def render_customization_results():
-    """Render customization results with enhanced error handling"""
+    """Render customization results with enhanced logging"""
+    logger.debug("🎨 Rendering customization results")
     results = st.session_state.customization_results
     
     if not results:
+        logger.debug("🎨 No customization results to render")
         return
     
     st.markdown('<div class="content-card">', unsafe_allow_html=True)
     
     # Check for errors first
     if results.get("error"):
+        logger.info(f"❌ Rendering customization error: {results['error']}")
         st.markdown("### ❌ Customization Failed")
         
         st.markdown(f'<div class="error-callout">{results["error"]}</div>', unsafe_allow_html=True)
@@ -742,20 +912,24 @@ def render_customization_results():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🎯 Run Product Analysis", use_container_width=True):
+                logger.info("🧭 User clicked: Go to Product Recommendation")
                 st.session_state.current_page = "recommendation"
                 st.rerun()
         
         with col2:
             if st.button("🔄 Try Different Product", use_container_width=True):
+                logger.info("🔄 User clicked: Try Different Product")
                 st.session_state.customization_results = {}
                 st.rerun()
     
     else:
         # Success case
+        logger.info("✅ Rendering successful customization results")
         st.markdown("### ✅ Customization Successful")
         
         # Before and After comparison
         if results.get('original_product') and results.get('customized_image_url'):
+            logger.debug("🖼️ Rendering before/after comparison")
             col1, col2 = st.columns(2)
             
             # Original product
@@ -786,6 +960,7 @@ def render_customization_results():
         
         # Customization reasoning
         if results.get('customization_reasoning'):
+            logger.debug("🧠 Rendering customization reasoning")
             st.markdown("---")
             st.markdown("### 🧠 Customization Reasoning")
             st.markdown(results['customization_reasoning'])
@@ -796,30 +971,32 @@ def render_customization_results():
         
         with col1:
             if st.button("🎨 Customize Another Product", use_container_width=True):
+                logger.info("🔄 User clicked: Customize Another Product")
                 st.session_state.customization_results = {}
                 st.rerun()
         
         with col2:
             if st.button("🛍️ View All Products", use_container_width=True):
+                logger.info("🧭 User clicked: View All Products")
                 st.session_state.current_page = "recommendation"
                 st.rerun()
         
         with col3:
             if st.button("🏠 Back to Home", use_container_width=True):
+                logger.info("🧭 User clicked: Back to Home")
                 st.session_state.current_page = "home"
                 st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
+    logger.debug("✅ Completed rendering customization results")
 
 # ============================================================================
-# PAGES
+# PAGES (WITH ENHANCED LOGGING)
 # ============================================================================
 
 def home_page():
-    """Home page with feature overview"""
-    #render_hero()
-    
-    # st.markdown("### 🚀 What You Can Do")
+    """Home page with feature overview and logging"""
+    logger.debug("🏠 Rendering home page")
     
     # Feature cards
     st.markdown('<div class="feature-grid">', unsafe_allow_html=True)
@@ -865,28 +1042,11 @@ def home_page():
     
     st.markdown(feature1_html + feature2_html + feature3_html, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Quick navigation buttons
-    # st.markdown("### 🚀 Quick Actions")
-    # col1, col2, col3 = st.columns(3)
-    
-    # with col1:
-    #     if st.button("🎯 Start Product Recommendation", type="primary", use_container_width=True):
-    #         st.session_state.current_page = "recommendation"
-    #         st.rerun()
-    
-    # with col2:
-    #     if st.button("🎨 Customize Products", use_container_width=True):
-    #         st.session_state.current_page = "customization"
-    #         st.rerun()
-    
-    # with col3:
-    #     if st.button("📝 Create Content", use_container_width=True):
-    #         st.session_state.current_page = "content"
-    #         st.rerun()
+    logger.debug("✅ Home page rendered successfully")
 
 def recommendation_page():
-    """Product recommendation page with real-time updates"""
+    """Product recommendation page with real-time updates and logging"""
+    logger.info("🎯 Loading product recommendation page")
     st.markdown("# 🎯 Product Recommendation")
     st.markdown("Get AI-powered Merch recommendations for the audience you want")
     
@@ -906,6 +1066,7 @@ def recommendation_page():
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
         if st.session_state.agent_running:
+            logger.debug("🔄 Showing analysis running state")
             st.markdown('''
             <div style="text-align: center; padding: 10px;">
                 <div class="loading-animation"></div>
@@ -915,6 +1076,7 @@ def recommendation_page():
         else:
             if st.button("🚀 Analyze", type="primary", use_container_width=True):
                 if query.strip():
+                    logger.info(f"🚀 Starting analysis with query: {query[:100]}...")
                     # Initialize analysis
                     st.session_state.query_to_run = query
                     st.session_state.agent_running = True
@@ -936,14 +1098,17 @@ def recommendation_page():
                     for step in analysis_steps:
                         st.session_state.step_status[step] = "pending"
                     
+                    logger.info("🔄 Analysis state initialized, triggering rerun")
                     st.rerun()
                 else:
+                    logger.warning("⚠️ User attempted analysis with empty query")
                     st.error("Please enter an audience description!")
     
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Start analysis after button click
     if st.session_state.get('analysis_started', False) and st.session_state.agent_running:
+        logger.info("📊 Starting analysis execution")
         st.session_state.analysis_started = False
         
         # Create progress containers
@@ -955,13 +1120,16 @@ def recommendation_page():
     
     # Show results if available and analysis complete
     if st.session_state.results and not st.session_state.agent_running:
+        logger.info("📊 Rendering analysis results")
         render_analysis_results()
         render_cultural_insights()
 
-
 def run_agent_query_with_progress(query: str, progress_container):
-    """Run agent query with live progress updates"""
+    """Run agent query with live progress updates and detailed logging"""
+    logger.info(f"🚀 Starting agent query execution: {query[:100]}...")
+    
     if not connect_to_agent_engine():
+        logger.error("❌ Failed to connect to agent engine, aborting analysis")
         st.session_state.agent_running = False
         st.error("Failed to connect to Agent Engine")
         return
@@ -979,23 +1147,31 @@ def run_agent_query_with_progress(query: str, progress_container):
         # Track current step
         current_step_idx = 0
         full_state = {}
+        event_count = 0
         
+        logger.info("📊 Initializing progress display")
         # Initial progress display
         with progress_container.container():
             render_real_time_progress(full_state)
         
         # Stream the query
+        logger.info(f"🔗 Starting stream query for user {st.session_state.user_id}")
         for event in st.session_state.agent_app.stream_query(
             user_id=st.session_state.user_id,
             session_id=st.session_state.agent_session["id"],
             message=query
         ):
+            event_count += 1
+            logger.debug(f"📨 Processing analysis event {event_count}")
+            
             # Track state changes
             if "state_delta" in event.get("actions", {}):
                 state_delta = event["actions"]["state_delta"]
                 if state_delta:
+                    logger.debug(f"🔍 Found state_delta with {len(state_delta)} keys")
                     for key, value in state_delta.items():
                         full_state[key] = value
+                        logger.debug(f"📊 Updated full_state[{key}]")
                     
                     # Update session state
                     st.session_state.results = full_state
@@ -1009,10 +1185,13 @@ def run_agent_query_with_progress(query: str, progress_container):
                         if check_step_completion(current_step_idx, full_state):
                             st.session_state.step_status[current_step] = "completed"
                             current_step_idx += 1
+                            logger.info(f"✅ Completed step {current_step_idx-1}: {current_step}")
                     
                     # Update progress display
                     with progress_container.container():
                         render_real_time_progress(full_state)
+        
+        logger.info(f"🔚 Analysis stream completed after {event_count} events")
         
         # Mark as complete
         st.session_state.step_status["✅ Analysis complete!"] = "completed"
@@ -1026,26 +1205,31 @@ def run_agent_query_with_progress(query: str, progress_container):
         time.sleep(1)
         progress_container.empty()
         
+        logger.info("✅ Analysis completed successfully, triggering final rerun")
         # Trigger rerun to show final results
         st.rerun()
         
     except Exception as e:
+        logger.error(f"❌ Analysis failed with exception: {e}", exc_info=True)
         st.session_state.agent_running = False
         progress_container.empty()
         st.error(f"Analysis failed: {e}")
 
 def customization_page():
-    """Product customization page with improved UX"""
+    """Product customization page with improved UX and logging"""
+    logger.info("🎨 Loading product customization page")
     st.markdown("# 🎨 Product Customization")
     st.markdown("Customize products based on audience insights")
     
     # Check if we have prerequisite data
     if not st.session_state.results.get("recommendations"):
+        logger.warning("⚠️ No product recommendations found, showing prerequisites message")
         st.markdown('<div class="content-card">', unsafe_allow_html=True)
         st.markdown("### ⚠️ Prerequisites Required")
         st.info("💡 Please run a product recommendation analysis first to see customization options.")
         
         if st.button("🎯 Go to Product Recommendation", type="primary", use_container_width=True):
+            logger.info("🧭 User clicked: Go to Product Recommendation from customization")
             st.session_state.current_page = "recommendation"
             st.rerun()
         
@@ -1057,6 +1241,8 @@ def customization_page():
     audience_count = len(st.session_state.results.get("detected_audience_names", []))
     product_count = len(st.session_state.results.get("recommendations", []))
     
+    logger.info(f"📊 Customization context - Persona: {persona_name}, Audiences: {audience_count}, Products: {product_count}")
+    
     st.markdown(f'<div class="success-callout">✅ <strong>Ready for customization!</strong><br>Persona: {persona_name} | Audiences: {audience_count} | Products: {product_count}</div>', unsafe_allow_html=True)
     
     # Customization interface
@@ -1066,6 +1252,7 @@ def customization_page():
     # Get list of available product IDs for validation
     available_products = st.session_state.results.get("recommendations", [])
     available_product_ids = [p.get("product_id", "") for p in available_products]
+    logger.debug(f"🛒 Available product IDs: {available_product_ids}")
     
     col1, col2 = st.columns([4, 1])
     
@@ -1086,6 +1273,7 @@ def customization_page():
             # Extract product ID
             if selected_option:
                 product_id = selected_option.split(" - ")[0]
+                logger.debug(f"🎯 Selected product ID from dropdown: {product_id}")
             else:
                 product_id = ""
         
@@ -1098,9 +1286,11 @@ def customization_page():
         
         if manual_product_id.strip():
             product_id = manual_product_id.strip()
+            logger.debug(f"🎯 Manual product ID entered: {product_id}")
         
         # Validation
         if product_id and product_id not in available_product_ids:
+            logger.warning(f"⚠️ Invalid product ID entered: {product_id}")
             st.warning(f"⚠️ Product ID '{product_id}' not found in your recommendations. Available IDs: {', '.join(available_product_ids[:3])}{'...' if len(available_product_ids) > 3 else ''}")
         
         customization_prompt = st.text_area(
@@ -1115,6 +1305,7 @@ def customization_page():
         
         # Show customization status
         if st.session_state.customization_running:
+            logger.debug("🔄 Showing customization running state")
             st.markdown(f'''
             <div style="text-align: center; padding: 20px;">
                 <div class="loading-animation"></div>
@@ -1131,10 +1322,13 @@ def customization_page():
                         disabled=button_disabled):
                 
                 if not product_id.strip():
+                    logger.warning("⚠️ Customization attempted without product ID")
                     st.error("Please select or enter a product ID!")
                 elif not customization_prompt.strip():
+                    logger.warning("⚠️ Customization attempted without prompt")
                     st.error("Please enter customization instructions!")
                 else:
+                    logger.info(f"🎨 Starting customization for product {product_id}")
                     st.session_state.customization_running = True
                     st.session_state.customization_results = {}
                     st.session_state.customization_status = "🚀 Starting customization..."
@@ -1151,6 +1345,7 @@ def customization_page():
     st.markdown("### 🛍️ Available Products for Customization")
     
     recommendations = st.session_state.results.get("recommendations", [])
+    logger.debug(f"🛒 Rendering {len(recommendations)} products for reference")
     
     # Show all products in 3x2 grid
     for row in range(2):  # 2 rows
@@ -1186,206 +1381,20 @@ def customization_page():
                         
                         st.markdown('</div>', unsafe_allow_html=True)
 
-# FIXED content_page() function - Shows loading state properly
-
-# def content_page():
-#     """Enhanced content page with FIXED loading state display"""
-    
-#     # Password protection (unchanged)
-#     if not st.session_state.get("content_authenticated", False):
-#         st.markdown("# 📝 Personalized Content Generation")
-#         st.markdown("This feature requires authentication to access.")
-        
-#         st.markdown('<div class="content-card">', unsafe_allow_html=True)
-#         st.markdown("### 🔐 Access Required")
-        
-#         col1, col2, col3 = st.columns([1, 2, 1])
-#         with col2:
-#             password = st.text_input("Enter Password:", type="password", placeholder="Enter access code")
-            
-#             if st.button("🔓 Access Content Creation", type="primary", use_container_width=True):
-#                 if password == "ColdPalmer20":
-#                     st.session_state.content_authenticated = True
-#                     st.success("✅ Access granted! Redirecting...")
-#                     time.sleep(1)
-#                     st.rerun()
-#                 else:
-#                     st.error("❌ Incorrect password. Please try again.")
-        
-#         st.markdown('</div>', unsafe_allow_html=True)
-#         return
-    
-#     st.markdown("# 📝 Personalized Content Generation")
-#     st.markdown("Generate personalized video content for Chelsea FC Fans using Qloo Research and ADK Agents")
-    
-#     # Content creation form
-#     st.markdown('<div class="content-card">', unsafe_allow_html=True)
-#     st.markdown("### 🎯 Tell us about yourself")
-    
-#     col1, col2 = st.columns(2)
-    
-#     with col1:
-#         location = st.text_input("📍 Location", value="Toronto", placeholder="Enter your city")
-#         age = st.number_input("🎂 Age", value=30, min_value=13, max_value=100, step=1)
-#         hobbies = st.text_input("🏃 Hobbies", value="travel, hiking", placeholder="e.g., travel, hiking, photography")
-    
-#     with col2:
-#         additional_details = st.text_area(
-#             "💼 Additional Details", 
-#             value="Profession is Senior Data Scientist",
-#             height=70,
-#             placeholder="Tell us more about yourself"
-#         )
-#         theme = st.text_input(
-#             "⚽ Theme", 
-#             value="Getting ready for Chelsea FC 2025-26 season",
-#             placeholder="What's the video theme?"
-#         )
-    
-#     # FIXED: Auto-run content creation if triggered
-#     if st.session_state.get("content_should_start", False):
-#         # Clear the trigger flag
-#         st.session_state.content_should_start = False
-        
-#         # Get the stored inputs
-#         inputs = st.session_state.get("content_inputs", {})
-#         if inputs:
-#             # Now run content creation
-#             run_content_creation(
-#                 inputs["location"], 
-#                 inputs["age"], 
-#                 inputs["hobbies"], 
-#                 inputs["additional_details"], 
-#                 inputs["theme"]
-#             )
-            
-#             # Clear inputs after running
-#             if "content_inputs" in st.session_state:
-#                 del st.session_state.content_inputs
-    
-#     # FIXED: Generate button section
-#     col1, col2, col3 = st.columns([2, 1, 2])
-#     with col2:
-#         if st.session_state.content_running:
-#             st.markdown(f'''
-#             <div style="text-align: center; padding: 20px;">
-#                 <div class="loading-animation"></div>
-#                 <p style="margin-top: 10px; color: #64748b; font-size: 0.9rem;">{st.session_state.content_status}</p>
-#                 <p style="margin-top: 5px; color: #f59e0b; font-size: 0.8rem;">⏱️ This may take 5-10 minutes</p>
-#                 <p style="margin-top: 5px; color: #6b7280; font-size: 0.7rem;">Auto-refreshing every 3 seconds...</p>
-#             </div>
-#             ''', unsafe_allow_html=True)
-            
-#             # Auto-refresh while running and no video found
-#             if not st.session_state.content_video_url:
-#                 time.sleep(3)
-#                 st.rerun()
-                
-#         else:
-#             if st.button("🎬 Generate Video", type="primary", use_container_width=True):
-#                 if all([location.strip(), age, hobbies.strip(), additional_details.strip(), theme.strip()]):
-#                     # FIXED: Set running state and store inputs for next cycle
-#                     st.session_state.content_running = True
-#                     st.session_state.content_video_url = None
-#                     st.session_state.content_status = "🚀 Starting video generation..."
-                    
-#                     # Store inputs for the next render cycle
-#                     st.session_state.content_inputs = {
-#                         "location": location,
-#                         "age": age,
-#                         "hobbies": hobbies,
-#                         "additional_details": additional_details,
-#                         "theme": theme
-#                     }
-                    
-#                     # Set flag to start content creation in next cycle
-#                     st.session_state.content_should_start = True
-                    
-#                     # Rerun immediately to show loading state
-#                     st.rerun()
-#                 else:
-#                     st.error("Please fill in all fields!")
-    
-#     st.markdown('</div>', unsafe_allow_html=True)
-    
-#     # Display video results (unchanged)
-#     if st.session_state.content_video_url and not st.session_state.content_running:
-#         st.markdown('<div class="content-card">', unsafe_allow_html=True)
-#         st.markdown("### 🎬 Your Personalized Video")
-        
-#         # Show video URL for debugging
-#         # with st.expander("🔍 Debug Info", expanded=False):
-#         #     st.code(f"Video URL: {st.session_state.content_video_url}")
-#         #     st.code(f"Status: {st.session_state.content_status}")
-        
-#         with st.spinner("📥 Downloading video from cloud storage..."):
-#             video_path = download_video(st.session_state.content_video_url)
-        
-#         if video_path:
-#             st.video(video_path)
-            
-#             with open(video_path, 'rb') as video_file:
-#                 st.download_button(
-#                     label="📥 Download Video",
-#                     data=video_file.read(),
-#                     file_name=f"chelsea_video_{uuid.uuid4().hex[:8]}.mp4",
-#                     mime="video/mp4",
-#                     type="primary",
-#                     use_container_width=True
-#                 )
-            
-#             # Show different success messages based on source
-#             if "fallback" in st.session_state.content_status.lower():
-#                 st.markdown('<div class="success-callout">🎉 Your Chelsea FC video is ready! (Using fallback video as demonstration)</div>', unsafe_allow_html=True)
-#             else:
-#                 st.markdown('<div class="success-callout">🎉 Your personalized Chelsea FC video is ready!</div>', unsafe_allow_html=True)
-            
-#             if st.button("🔄 Generate Another Video", use_container_width=True):
-#                 st.session_state.content_video_url = None
-#                 st.session_state.content_status = ""
-#                 st.session_state.content_running = False
-#                 # Clear any leftover flags
-#                 st.session_state.content_should_start = False
-#                 if "content_inputs" in st.session_state:
-#                     del st.session_state.content_inputs
-#                 st.rerun()
-#         else:
-#             st.error("❌ Failed to download video. Please try again.")
-#             if st.button("🔄 Try Again", use_container_width=True):
-#                 st.session_state.content_video_url = None
-#                 st.session_state.content_status = ""
-#                 st.session_state.content_running = False
-#                 st.session_state.content_should_start = False
-#                 if "content_inputs" in st.session_state:
-#                     del st.session_state.content_inputs
-#                 st.rerun()
-        
-#         st.markdown('</div>', unsafe_allow_html=True)
-    
-#     # Show error state
-#     elif st.session_state.content_status.startswith("❌") and not st.session_state.content_running:
-#         st.markdown('<div class="content-card">', unsafe_allow_html=True)
-#         st.markdown("### ❌ Video Generation Failed")
-#         st.error(st.session_state.content_status)
-        
-#         if st.button("🔄 Try Again", use_container_width=True):
-#             st.session_state.content_video_url = None
-#             st.session_state.content_status = ""
-#             st.session_state.content_running = False
-#             st.session_state.content_should_start = False
-#             if "content_inputs" in st.session_state:
-#                 del st.session_state.content_inputs
-#             st.rerun()
-        
-#         st.markdown('</div>', unsafe_allow_html=True)
-
-
+# ============================================================================
+# NEW: ASYNC CONTENT PAGE (WITH ENHANCED LOGGING)
+# ============================================================================
 
 def content_page():
-    """METHOD 2: Complete content page with manual refresh approach"""
+    """NEW: Async content page with background job processing and comprehensive logging"""
+    logger.info("📝 Loading personalized content page")
+    
+    # Clean up old jobs first
+    cleanup_old_jobs()
     
     # Password protection
     if not st.session_state.get("content_authenticated", False):
+        logger.debug("🔐 Showing authentication screen")
         st.markdown("# 📝 Personalized Content Generation")
         st.markdown("This feature requires authentication to access.")
         
@@ -1398,178 +1407,160 @@ def content_page():
             
             if st.button("🔓 Access Content Creation", type="primary", use_container_width=True):
                 if password == "ColdPalmer20":
+                    logger.info("✅ Content creation access granted")
                     st.session_state.content_authenticated = True
                     st.success("✅ Access granted! Redirecting...")
                     time.sleep(1)
                     st.rerun()
                 else:
+                    logger.warning("❌ Invalid password attempt for content creation")
                     st.error("❌ Incorrect password. Please try again.")
         
         st.markdown('</div>', unsafe_allow_html=True)
         return
     
     st.markdown("# 📝 Personalized Content Generation")
-    st.markdown("Generate personalized video content for Chelsea FC Fans using Qloo Research and ADK Agents")
+    st.markdown("Generate personalized video content for Chelsea FC Fans using AI")
     
-    # 🔧 FIX: Check for completed video FIRST (before any form logic)
-    if st.session_state.get("content_video_url") and not st.session_state.get("content_running", False):
-        st.markdown('<div class="content-card">', unsafe_allow_html=True)
-        st.markdown("### 🎬 Your Personalized Video")
-        
-        # Debug information
-        with st.expander("🔍 Debug Information", expanded=False):
-            st.code(f"Video URL: {st.session_state.content_video_url}")
-            st.code(f"Generation Status: {st.session_state.get('content_status', 'Unknown')}")
-            st.code(f"Content Running: {st.session_state.get('content_running', False)}")
-        
-        # Display video directly
-        try:
-            st.video(st.session_state.content_video_url)
-            st.success("🎉 Video displayed successfully!")
+    # Check for any active or completed jobs
+    jobs = st.session_state.get("video_jobs", {})
+    active_jobs = [job_id for job_id, job in jobs.items() 
+                  if job["status"] in ["starting", "processing"]]
+    completed_jobs = [job_id for job_id, job in jobs.items() 
+                     if job["status"] == "completed"]
+    
+    logger.info(f"📊 Video jobs status - Active: {len(active_jobs)}, Completed: {len(completed_jobs)}")
+    
+    # STEP 1: Show completed videos first
+    for job_id in completed_jobs:
+        job = jobs[job_id]
+        if job.get("video_url"):
+            logger.info(f"🎬 Rendering completed video for job {job_id}")
+            st.markdown('<div class="content-card">', unsafe_allow_html=True)
+            st.markdown(f"### 🎬 Video Ready! (Job: {job_id})")
             
-            # Show video source info
-            if "fallback" in st.session_state.get("content_status", "").lower():
-                st.info("📺 Showing demo video (fallback)")
-            else:
-                st.success("📺 Your personalized video is ready!")
-                
-        except Exception as e:
-            st.error(f"❌ Video display error: {str(e)}")
-            st.markdown(f"🔗 **Direct link:** [Open Video]({st.session_state.content_video_url})")
+            video_url = job["video_url"]
+            
+            # Show video URL and embed
+            st.markdown(f"### 🔗 Video URL:")
+            st.markdown(f"[**Click here to open video**]({video_url})")
+            st.code(video_url)
+            
+            try:
+                st.video(video_url)
+                st.success("✅ Video ready!")
+                logger.debug(f"✅ Successfully embedded video for job {job_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not embed video for job {job_id}: {e}")
+                st.warning(f"⚠️ Could not embed: {e}")
+                st.info("💡 Use the link above")
+            
+            # Show generation details
+            if job.get("completion_time"):
+                duration = job["completion_time"] - job["start_time"]
+                st.info(f"⏱️ Generated in {duration.total_seconds():.0f} seconds")
+            
+            if job.get("note"):
+                st.caption(f"📝 {job['note']}")
+            
+            # Remove completed job button
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"🗑️ Remove Job {job_id}", key=f"remove_{job_id}", use_container_width=True):
+                    logger.info(f"🗑️ User removing completed job {job_id}")
+                    del st.session_state.video_jobs[job_id]
+                    st.rerun()
+            with col2:
+                if st.button(f"📋 Copy URL", key=f"copy_{job_id}", use_container_width=True):
+                    st.success("URL shown above - copy from code box")
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+    
+    # STEP 2: Show active jobs
+    for job_id in active_jobs:
+        job = jobs[job_id]
+        logger.debug(f"⏳ Processing active job {job_id}")
+        st.markdown('<div class="content-card">', unsafe_allow_html=True)
+        st.markdown(f"### ⏳ Video Generation in Progress (Job: {job_id})")
         
-        # Action buttons
-        col1, col2, col3 = st.columns(3)
+        # Progress info
+        elapsed = datetime.now() - job["start_time"]
+        st.info(f"⏱️ Running for {elapsed.total_seconds():.0f} seconds")
+        st.markdown(f"**Status:** {job.get('progress', 'Processing...')}")
         
-        with col1:
-            if st.button("🔄 Generate Another Video", use_container_width=True):
-                # Clear all video-related state
-                for key in ["content_video_url", "content_status", "content_running", 
-                           "content_should_start", "content_inputs", "content_video_found", "content_start_time"]:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                st.rerun()
+        # Process a chunk of the job
+        logger.debug(f"🔄 Processing chunk for active job {job_id}")
+        if process_video_job_chunk(job_id, max_events=3):
+            # Job completed during this check
+            logger.info(f"✅ Job {job_id} completed during chunk processing")
+            st.rerun()
         
-        with col2:
-            st.markdown(f"[🔗 Open in New Tab]({st.session_state.content_video_url})")
-        
-        with col3:
-            if st.button("📋 Copy URL", use_container_width=True):
-                st.code(st.session_state.content_video_url)
+        # Manual refresh button
+        if st.button(f"🔄 Check Progress", key=f"check_{job_id}", use_container_width=True):
+            logger.info(f"🔄 User clicked check progress for job {job_id}")
+            st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
-        return  # Return early to prevent form from showing
     
-    # Content creation form (only show if no video is ready)
-    st.markdown('<div class="content-card">', unsafe_allow_html=True)
-    st.markdown("### 🎯 Tell us about yourself")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        location = st.text_input("📍 Location", value="Toronto", placeholder="Enter your city")
-        age = st.number_input("🎂 Age", value=30, min_value=13, max_value=100, step=1)
-        hobbies = st.text_input("🏃 Hobbies", value="travel, hiking", placeholder="e.g., travel, hiking, photography")
-    
-    with col2:
-        additional_details = st.text_area(
-            "💼 Additional Details", 
-            value="Profession is Senior Data Scientist",
-            height=70,
-            placeholder="Tell us more about yourself"
-        )
-        theme = st.text_input(
-            "⚽ Theme", 
-            value="Getting ready for Chelsea FC 2025-26 season",
-            placeholder="What's the video theme?"
-        )
-    
-    # 🔧 FIX: Non-blocking content creation trigger
-    if st.session_state.get("content_should_start", False):
-        st.session_state.content_should_start = False
-        inputs = st.session_state.get("content_inputs", {})
-        if inputs:
-            # 🔧 NON-BLOCKING: Start content creation in background
-            # This will run but won't block the UI since we removed st.rerun() calls
-            run_content_creation(
-                inputs["location"], 
-                inputs["age"], 
-                inputs["hobbies"], 
-                inputs["additional_details"], 
-                inputs["theme"]
+    # STEP 3: Show form for new video generation (only if no active jobs)
+    if not active_jobs:
+        logger.debug("📝 Rendering new video generation form")
+        st.markdown('<div class="content-card">', unsafe_allow_html=True)
+        st.markdown("### 🎯 Generate New Video")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            location = st.text_input("📍 Location", value="Toronto", placeholder="Enter your city")
+            age = st.number_input("🎂 Age", value=30, min_value=13, max_value=100, step=1)
+            hobbies = st.text_input("🏃 Hobbies", value="travel, hiking", placeholder="e.g., travel, hiking, photography")
+        
+        with col2:
+            additional_details = st.text_area(
+                "💼 Additional Details", 
+                value="Profession is Senior Data Scientist",
+                height=70,
+                placeholder="Tell us more about yourself"
             )
-            # Clear inputs after starting
-            if "content_inputs" in st.session_state:
-                del st.session_state.content_inputs
-            
-            # Force one rerun to show loading state
-            st.rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([2, 1, 2])
-    with col2:
-        if st.session_state.get("content_running", False):
-            # 🔧 METHOD 2: MANUAL REFRESH VERSION
-            st.markdown(f'''
-            <div style="text-align: center; padding: 20px;">
-                <div class="loading-animation"></div>
-                <p style="margin-top: 10px; color: #64748b; font-size: 0.9rem;">{st.session_state.get("content_status", "Processing...")}</p>
-                <p style="margin-top: 5px; color: #f59e0b; font-size: 0.8rem;">⏱️ This may take 5-10 minutes</p>
-                <p style="margin-top: 5px; color: #6b7280; font-size: 0.7rem;">👆 Click button below to check progress</p>
-            </div>
-            ''', unsafe_allow_html=True)
-            
-            # 🔧 METHOD 2: Manual refresh button
-            if st.button("🔄 Check Status", use_container_width=True, type="secondary"):
-                st.rerun()
-            
-            # 🔧 METHOD 2: Optional time estimation
-            if st.session_state.get("content_start_time"):
-                elapsed = time.time() - st.session_state.content_start_time
-                remaining = max(0, 800 - elapsed)  # 7 minutes = 420 seconds
-                minutes = int(remaining // 60)
-                seconds = int(remaining % 60)
-                
-                if remaining > 0:
-                    st.caption(f"⏱️ Estimated time remaining: ~{minutes}m {seconds}s")
-                else:
-                    st.caption("🎯 Video should be ready! Click 'Check Status'")
-                
-        else:
-            if st.button("🎬 Generate Video", type="primary", use_container_width=True):
+            theme = st.text_input(
+                "⚽ Theme", 
+                value="Getting ready for Chelsea FC 2025-26 season",
+                placeholder="What's the video theme?"
+            )
+        
+        # Generate button
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col2:
+            if st.button("🎬 Start Video Generation", type="primary", use_container_width=True):
                 if all([location.strip(), age, hobbies.strip(), additional_details.strip(), theme.strip()]):
-                    # Set up for content generation
-                    st.session_state.content_running = True
-                    st.session_state.content_video_url = None
-                    st.session_state.content_status = "🚀 Starting video generation..."
-                    st.session_state.content_start_time = time.time()  # 🔧 METHOD 2: Track start time
-                    
-                    # Store inputs for processing
-                    st.session_state.content_inputs = {
-                        "location": location,
-                        "age": age,
-                        "hobbies": hobbies,
-                        "additional_details": additional_details,
-                        "theme": theme
-                    }
-                    
-                    # Trigger content creation
-                    st.session_state.content_should_start = True
-                    st.rerun()
+                    logger.info(f"🎬 Starting new video generation - Location: {location}, Age: {age}")
+                    # Start async job
+                    job_id = start_video_generation_async(location, age, hobbies, additional_details, theme)
+                    if job_id:
+                        logger.info(f"✅ Video generation job started successfully: {job_id}")
+                        st.success(f"✅ Video generation started! Job ID: {job_id}")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        logger.error("❌ Failed to start video generation job")
+                        st.error("❌ Failed to start video generation")
                 else:
+                    logger.warning("⚠️ User attempted video generation with incomplete form")
                     st.error("Please fill in all fields!")
-
-# 🗑️ REMOVE THE DOWNLOAD_VIDEO FUNCTION ENTIRELY
-# No longer needed since we're displaying directly
-
-# You can delete this function from your code:
-# def download_video(video_url: str) -> Optional[str]:
-#     # DELETE THIS ENTIRE FUNCTION
-
-
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    else:
+        # Show message about active jobs
+        logger.debug("📝 Showing active jobs message")
+        st.markdown('<div class="content-card">', unsafe_allow_html=True)
+        st.markdown("### ⏳ Video Generation in Progress")
+        st.info(f"🎬 {len(active_jobs)} video(s) currently being generated. Please wait or check progress above.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def about_page():
-    """About page"""
+    """About page with logging"""
+    logger.debug("ℹ️ Rendering about page")
     st.markdown("# ℹ️ About")
     
     col1, col2 = st.columns(2)
@@ -1612,11 +1603,27 @@ def about_page():
         st.code(f"User ID: {st.session_state.user_id}")
         st.code(f"Session ID: {st.session_state.session_id}")
         
+        # Show video jobs status
+        if st.session_state.get("video_jobs"):
+            st.markdown("### 🎬 Video Jobs")
+            for job_id, job in st.session_state.video_jobs.items():
+                status_color = {
+                    "processing": "🟡",
+                    "completed": "🟢", 
+                    "error": "🔴",
+                    "starting": "🔵"
+                }.get(job["status"], "⚪")
+                st.markdown(f"{status_color} `{job_id}`: {job['status']}")
+                logger.debug(f"📊 Displayed job status: {job_id} - {job['status']}")
+        
         if st.session_state.agent_app:
             st.success("✅ Agent Engine Connected")
+            logger.debug("✅ Agent engine connection confirmed")
         else:
             st.warning("⚠️ Agent Engine Disconnected")
+            logger.warning("⚠️ Agent engine disconnected")
             if st.button("🔄 Reconnect"):
+                logger.info("🔄 User clicked reconnect agent engine")
                 st.session_state.agent_app = None
                 st.session_state.agent_session = None
                 st.rerun()
@@ -1626,23 +1633,42 @@ def about_page():
 # ============================================================================
 
 def main():
-    """Main application logic"""
-    initialize_session_state()
+    """Main application logic with comprehensive logging"""
+    logger.info("🚀 Starting main application")
     
-    # Navigation
-    render_navigation()
-    
-    # Route to pages
-    if st.session_state.current_page == "home":
-        home_page()
-    elif st.session_state.current_page == "recommendation":
-        recommendation_page()
-    elif st.session_state.current_page == "customization":
-        customization_page()
-    elif st.session_state.current_page == "content":
-        content_page()
-    elif st.session_state.current_page == "about":
-        about_page()
+    try:
+        # Initialize session state
+        initialize_session_state()
+        
+        # Navigation
+        render_navigation()
+        
+        # Route to pages
+        current_page = st.session_state.current_page
+        logger.info(f"📄 Routing to page: {current_page}")
+        
+        if current_page == "home":
+            home_page()
+        elif current_page == "recommendation":
+            recommendation_page()
+        elif current_page == "customization":
+            customization_page()
+        elif current_page == "content":
+            content_page()
+        elif current_page == "about":
+            about_page()
+        else:
+            logger.warning(f"⚠️ Unknown page requested: {current_page}")
+            st.error(f"Unknown page: {current_page}")
+        
+        logger.debug(f"✅ Successfully rendered page: {current_page}")
+        
+    except Exception as e:
+        logger.error(f"❌ Critical error in main application: {e}", exc_info=True)
+        st.error(f"Application error: {e}")
+        st.error("Please refresh the page or contact support if the problem persists.")
 
 if __name__ == "__main__":
+    logger.info("🎬 Application starting...")
     main()
+    logger.info("🏁 Application main function completed")
