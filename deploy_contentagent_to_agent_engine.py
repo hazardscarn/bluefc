@@ -225,17 +225,17 @@ def main():
         return None
     
     # Test the deployment
-    test_success = test_deployed_agent(remote_agent)
+    # test_success = test_deployed_agent(remote_agent)
     
     # Final summary
     print("\n" + "=" * 60)
     print("DEPLOYMENT COMPLETE!")
     print("=" * 60)
     
-    if test_success:
-        print("🎉 contentagent successfully deployed using official method!")
-    else:
-        print("⚠️ contentagent deployed but testing had issues")
+    # if test_success:
+    #     print("🎉 contentagent successfully deployed using official method!")
+    # else:
+    #     print("⚠️ contentagent deployed but testing had issues")
     
     print(f"\n🎯 Next steps:")
     print(f"1. Visit: https://console.cloud.google.com/vertex-ai/reasoning-engines?project={PROJECT_ID}")

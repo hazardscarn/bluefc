@@ -26,7 +26,7 @@ RESOURCE_ID = "7774435613771563008"
 RESOURCE_NAME = f"projects/{PROJECT_ID}/locations/{LOCATION}/reasoningEngines/{RESOURCE_ID}"
 
 # Content Creation Agent
-CONTENT_RESOURCE_ID = "7019519726233583616"
+CONTENT_RESOURCE_ID = "5314625792297140224"
 CONTENT_RESOURCE_NAME = f"projects/{PROJECT_ID}/locations/{LOCATION}/reasoningEngines/{CONTENT_RESOURCE_ID}"
 
 # ============================================================================
