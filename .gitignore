@@ -221,3 +221,4 @@ merch_app copy.py
 app.py
 frontend
 setup_gcs_buckets_merchagent.py
+simple_app copy.py
