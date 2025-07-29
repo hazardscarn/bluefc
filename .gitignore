@@ -216,5 +216,8 @@ archive
 political_nb.ipynb
 pagesss
 onetimesetup_for_agentengine.txt
+onetimesetup_for_contentengine.txt
 merch_app copy.py
 app.py
+frontend
+setup_gcs_buckets_merchagent.py
